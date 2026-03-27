@@ -1,0 +1,3 @@
+[submodule "conformance-suite"]
+	path = conformance-suite
+	url = https://gitlab.com/openid/conformance-suite.git

@@ -1,0 +1,37 @@
+{
+  "description": "Vouch {VERSION} OIDC Form Post Basic OP",
+  "variant": {
+    "server_metadata": "discovery",
+    "client_registration": "dynamic_client"
+  },
+  "server": {
+    "discoveryUrl": "{BASEURL}/.well-known/openid-configuration"
+  },
+  "client": {
+    "client_name": "vouch-oidcc-formpost",
+    "scope": "openid email"
+  },
+  "browser": [
+    {
+      "match": "{BASEURL}/oauth/authorize*",
+      "tasks": [
+        {
+          "task": "Login",
+          "optional": true,
+          "match": "{BASEURL}/login*",
+          "commands": [
+            ["click", "id", "cert-login"]
+          ]
+        },
+        {
+          "task": "Verify Complete",
+          "optional": true,
+          "match": "*/test/*/callback*",
+          "commands": [
+            ["wait", "id", "submission_complete", 10]
+          ]
+        }
+      ]
+    }
+  ]
+}

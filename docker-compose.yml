@@ -1,0 +1,94 @@
+services:
+  mongodb:
+    image: mongo:6.0.13
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - conformance-net
+
+  # Conformance suite nginx (TLS reverse proxy for the Java server).
+  # Service MUST be named "nginx" because the Java server's --startredir
+  # flag hardcodes "redir :8443 nginx:8443".
+  nginx:
+    build:
+      context: ./conformance-suite/nginx
+    ports:
+      - "8443:8443"
+    depends_on:
+      - server
+    networks:
+      - conformance-net
+
+  # Conformance suite Java test server.
+  server:
+    build:
+      context: ./conformance-suite/server-dev
+    volumes:
+      - ./conformance-suite/target/:/server/
+      - ./certs/vouch-proxy.crt:/certs/vouch-proxy.crt:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        keytool -importcert -noprompt -alias vouch-proxy \
+          -file /certs/vouch-proxy.crt \
+          -keystore $$JAVA_HOME/lib/security/cacerts \
+          -storepass changeit 2>/dev/null || true
+        exec java \
+          -jar /server/fapi-test-suite.jar \
+          -Djdk.tls.maxHandshakeMessageSize=65536 \
+          --fintechlabs.base_url=https://localhost.emobix.co.uk:8443 \
+          --fintechlabs.devmode=true \
+          --fintechlabs.startredir=true
+    links:
+      - mongodb:mongodb
+    depends_on:
+      - mongodb
+    networks:
+      - conformance-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500k"
+        max-file: "5"
+
+  # Vouch OIDC server (HTTP, proxied via vouch-proxy for TLS).
+  vouch:
+    build:
+      context: ${VOUCH_REPO_PATH:-../vouch}
+    ports:
+      - "3000:3000"
+    environment:
+      VOUCH_LISTEN_ADDR: "0.0.0.0:3000"
+      VOUCH_BASE_URL: "https://vouch-proxy"
+      VOUCH_RP_ID: "vouch-proxy"
+      VOUCH_RP_NAME: "Vouch Conformance"
+      VOUCH_JWT_SECRET: "local-conformance-testing-secret-value-not-for-production"
+      VOUCH_CERTIFICATION_TEST_TOKEN: "local-cert-test-token"
+      VOUCH_SSH_CA_KEY_PATH: ""
+      VOUCH_DATABASE_URL: "sqlite:/data/vouch.db?mode=rwc"
+      VOUCH_TRUSTED_PROXIES: "0.0.0.0/0"
+    volumes:
+      - vouch-data:/data
+    networks:
+      - conformance-net
+
+  # TLS termination proxy for vouch (self-signed cert).
+  vouch-proxy:
+    build:
+      context: ./nginx
+    ports:
+      - "9443:443"
+    volumes:
+      - ./certs/vouch-proxy.crt:/etc/ssl/certs/vouch-proxy.crt:ro
+      - ./certs/vouch-proxy.key:/etc/ssl/private/vouch-proxy.key:ro
+    depends_on:
+      - vouch
+    networks:
+      - conformance-net
+
+networks:
+  conformance-net:
+
+volumes:
+  mongo-data:
+  vouch-data:
