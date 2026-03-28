@@ -62,17 +62,25 @@ def build_payload(
     client_alias: str,
     public_jwks: dict | None,
     conformance_base_url: str,
+    is_second_client: bool = False,
 ) -> dict:
     callback = (
         f"{conformance_base_url}/test/a/{client_alias}/callback"
     )
     if public_jwks is not None:
+        # The conformance suite's happy-flow adds dummy query params
+        # to the second client's redirect_uri. Both must be registered.
+        redirect_uris = [callback]
+        if is_second_client:
+            redirect_uris.append(
+                f"{callback}?dummy1=lorem&dummy2=ipsum"
+            )
         return {
-            "redirect_uris": [callback],
+            "redirect_uris": redirect_uris,
             "token_endpoint_auth_method": "private_key_jwt",
             "grant_types": ["authorization_code"],
             "response_types": ["code"],
-            "scope": "openid offline_access",
+            "scope": "openid email",
             "jwks": public_jwks,
             "dpop_bound_access_tokens": True,
         }
@@ -181,7 +189,8 @@ def main() -> None:
             "# ES256 key pair generated for client2", file=sys.stderr
         )
         payload2 = build_payload(
-            client_alias, public_jwks2, args.conformance_url
+            client_alias, public_jwks2, args.conformance_url,
+            is_second_client=True,
         )
         response2 = post_dcr(args.vouch_url, payload2)
         print(

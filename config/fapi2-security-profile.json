@@ -13,7 +13,7 @@
   "client": {
     "client_id": "{CLIENT_ID}",
     "jwks": {CLIENT_JWKS},
-    "scope": "openid offline_access",
+    "scope": "openid email",
     "registration_access_token": "{CLIENT_REG_TOKEN}"
   },
   "resource": {
@@ -22,7 +22,7 @@
   "client2": {
     "client_id": "{CLIENT2_ID}",
     "jwks": {CLIENT2_JWKS},
-    "scope": "openid offline_access",
+    "scope": "openid email",
     "registration_access_token": "{CLIENT2_REG_TOKEN}"
   },
   "browser": [
