@@ -78,7 +78,13 @@ def load_config(
     config = json.loads(raw)
 
     variant = config.pop("variant", None)
-    config.pop("client_alias", None)
+
+    # Rename client_alias -> alias (the conformance API field name).
+    # When alias is set, redirect_uri uses /test/a/{alias}/callback
+    # which matches the pre-registered redirect_uri.
+    client_alias = config.pop("client_alias", None)
+    if client_alias and "alias" not in config:
+        config["alias"] = client_alias
 
     return config, variant
 

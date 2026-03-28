@@ -72,7 +72,7 @@ def build_payload(
             "token_endpoint_auth_method": "private_key_jwt",
             "grant_types": ["authorization_code"],
             "response_types": ["code"],
-            "scope": "openid",
+            "scope": "openid offline_access",
             "jwks": public_jwks,
             "dpop_bound_access_tokens": True,
         }
