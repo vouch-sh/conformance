@@ -2,7 +2,7 @@
 	restart-vouch vouch-logs \
 	test-oidc-basic test-oidc-implicit test-oidc-hybrid \
 	test-oidc-config test-oidc-dynamic test-oidc-formpost \
-	test-fapi2 test-all rerun-failures
+	test-fapi2 test-fapi2-ms test-all rerun-failures
 
 CONFORMANCE_SERVER ?= https://localhost.emobix.co.uk:8443
 VOUCH_URL          ?= http://localhost:3000
@@ -116,6 +116,18 @@ test-fapi2:
 		--base-url $(VOUCH_BASE_URL) \
 		--conformance-server $(CONFORMANCE_SERVER)
 
+test-fapi2-ms:
+	@eval "$$(python3 $(SCRIPTS)/register_client.py \
+		--plan fapi2-message-signing-final-test-plan \
+		--config $(CONFIG)/fapi2-message-signing.json \
+		--vouch-url $(VOUCH_URL) \
+		--conformance-url $(CONFORMANCE_SERVER))" && \
+	python3 $(SCRIPTS)/run.py \
+		--plan fapi2-message-signing-final-test-plan \
+		--config $(CONFIG)/fapi2-message-signing.json \
+		--base-url $(VOUCH_BASE_URL) \
+		--conformance-server $(CONFORMANCE_SERVER)
+
 # -- Iteration helpers ---------------------------------------------------------
 
 restart-vouch:
@@ -139,4 +151,4 @@ rerun-failures:
 # -- Run all -------------------------------------------------------------------
 
 test-all: test-oidc-basic test-oidc-implicit test-oidc-hybrid \
-	test-oidc-config test-oidc-dynamic test-oidc-formpost test-fapi2
+	test-oidc-config test-oidc-dynamic test-oidc-formpost test-fapi2 test-fapi2-ms
