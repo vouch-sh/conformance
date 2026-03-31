@@ -2,10 +2,13 @@
 	restart-vouch vouch-logs \
 	test-oidc-basic test-oidc-implicit test-oidc-hybrid \
 	test-oidc-config test-oidc-dynamic test-oidc-formpost \
-	test-fapi2 test-fapi2-ms test-all rerun-failures
+	test-fapi2 test-fapi2-sp-mtls-mtls test-fapi2-sp-mtls-dpop \
+	test-fapi2-sp-pk-mtls test-fapi2-ms test-fapi2-ms-jarm \
+	test-fapi2-all-sp test-fapi2-all-ms test-fapi2-all \
+	test-all rerun-failures
 
 CONFORMANCE_SERVER ?= https://localhost.emobix.co.uk:8443
-VOUCH_URL          ?= http://localhost:3000
+VOUCH_URL          ?= https://localhost:9443
 VOUCH_BASE_URL     ?= https://vouch-proxy
 SCRIPTS            := scripts
 CONFIG             := config
@@ -25,6 +28,11 @@ certs:
 			-addext "subjectAltName=DNS:vouch-proxy,DNS:localhost" \
 			2>/dev/null && \
 		echo "Generated certs/vouch-proxy.crt"
+	@test -f certs/vouch-tls.env || { \
+		echo "VOUCH_TLS_CERT=$$(base64 < certs/vouch-proxy.crt)" > certs/vouch-tls.env && \
+		echo "VOUCH_TLS_KEY=$$(base64 < certs/vouch-proxy.key)" >> certs/vouch-tls.env && \
+		echo "Generated certs/vouch-tls.env"; \
+	}
 
 build: init certs
 	cd conformance-suite && \
@@ -49,7 +57,7 @@ wait:
 	done
 	@echo "Conformance suite is ready"
 	@echo "Waiting for vouch server..."
-	@until curl -sfm 5 $(VOUCH_URL)/health >/dev/null 2>&1; do \
+	@until curl -ksfm 5 $(VOUCH_URL)/health >/dev/null 2>&1; do \
 		sleep 5; \
 	done
 	@echo "Vouch server is ready"
@@ -102,7 +110,43 @@ test-oidc-formpost:
 		--base-url $(VOUCH_BASE_URL) \
 		--conformance-server $(CONFORMANCE_SERVER)
 
-# -- FAPI 2.0 test plan -------------------------------------------------------
+# -- FAPI 2.0 Security Profile (columns 1-5) ----------------------------------
+
+test-fapi2-sp-mtls-mtls:
+	@eval "$$(python3 $(SCRIPTS)/register_client.py \
+		--plan fapi2-security-profile-final-test-plan \
+		--config $(CONFIG)/fapi2-sp-mtls-mtls.json \
+		--vouch-url $(VOUCH_URL) \
+		--conformance-url $(CONFORMANCE_SERVER))" && \
+	python3 $(SCRIPTS)/run.py \
+		--plan fapi2-security-profile-final-test-plan \
+		--config $(CONFIG)/fapi2-sp-mtls-mtls.json \
+		--base-url $(VOUCH_BASE_URL) \
+		--conformance-server $(CONFORMANCE_SERVER)
+
+test-fapi2-sp-mtls-dpop:
+	@eval "$$(python3 $(SCRIPTS)/register_client.py \
+		--plan fapi2-security-profile-final-test-plan \
+		--config $(CONFIG)/fapi2-sp-mtls-dpop.json \
+		--vouch-url $(VOUCH_URL) \
+		--conformance-url $(CONFORMANCE_SERVER))" && \
+	python3 $(SCRIPTS)/run.py \
+		--plan fapi2-security-profile-final-test-plan \
+		--config $(CONFIG)/fapi2-sp-mtls-dpop.json \
+		--base-url $(VOUCH_BASE_URL) \
+		--conformance-server $(CONFORMANCE_SERVER)
+
+test-fapi2-sp-pk-mtls:
+	@eval "$$(python3 $(SCRIPTS)/register_client.py \
+		--plan fapi2-security-profile-final-test-plan \
+		--config $(CONFIG)/fapi2-sp-pk-mtls.json \
+		--vouch-url $(VOUCH_URL) \
+		--conformance-url $(CONFORMANCE_SERVER))" && \
+	python3 $(SCRIPTS)/run.py \
+		--plan fapi2-security-profile-final-test-plan \
+		--config $(CONFIG)/fapi2-sp-pk-mtls.json \
+		--base-url $(VOUCH_BASE_URL) \
+		--conformance-server $(CONFORMANCE_SERVER)
 
 test-fapi2:
 	@eval "$$(python3 $(SCRIPTS)/register_client.py \
@@ -116,6 +160,8 @@ test-fapi2:
 		--base-url $(VOUCH_BASE_URL) \
 		--conformance-server $(CONFORMANCE_SERVER)
 
+# -- FAPI 2.0 Message Signing (columns 6-7) -----------------------------------
+
 test-fapi2-ms:
 	@eval "$$(python3 $(SCRIPTS)/register_client.py \
 		--plan fapi2-message-signing-final-test-plan \
@@ -128,12 +174,33 @@ test-fapi2-ms:
 		--base-url $(VOUCH_BASE_URL) \
 		--conformance-server $(CONFORMANCE_SERVER)
 
+test-fapi2-ms-jarm:
+	@eval "$$(python3 $(SCRIPTS)/register_client.py \
+		--plan fapi2-message-signing-final-test-plan \
+		--config $(CONFIG)/fapi2-ms-jarm.json \
+		--vouch-url $(VOUCH_URL) \
+		--conformance-url $(CONFORMANCE_SERVER))" && \
+	python3 $(SCRIPTS)/run.py \
+		--plan fapi2-message-signing-final-test-plan \
+		--config $(CONFIG)/fapi2-ms-jarm.json \
+		--base-url $(VOUCH_BASE_URL) \
+		--conformance-server $(CONFORMANCE_SERVER)
+
+# -- FAPI 2.0 grouping targets ------------------------------------------------
+
+test-fapi2-all-sp: test-fapi2-sp-mtls-mtls test-fapi2-sp-mtls-dpop \
+	test-fapi2-sp-pk-mtls test-fapi2
+
+test-fapi2-all-ms: test-fapi2-ms test-fapi2-ms-jarm
+
+test-fapi2-all: test-fapi2-all-sp test-fapi2-all-ms
+
 # -- Iteration helpers ---------------------------------------------------------
 
 restart-vouch:
 	docker compose up -d --build --no-deps vouch
 	@echo "Waiting for vouch..."
-	@until curl -sfm 5 $(VOUCH_URL)/health >/dev/null 2>&1; do \
+	@until curl -ksfm 5 $(VOUCH_URL)/health >/dev/null 2>&1; do \
 		sleep 2; \
 	done
 	@echo "Vouch restarted"
@@ -151,4 +218,4 @@ rerun-failures:
 # -- Run all -------------------------------------------------------------------
 
 test-all: test-oidc-basic test-oidc-implicit test-oidc-hybrid \
-	test-oidc-config test-oidc-dynamic test-oidc-formpost test-fapi2 test-fapi2-ms
+	test-oidc-config test-oidc-dynamic test-oidc-formpost test-fapi2-all

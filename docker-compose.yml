@@ -51,12 +51,17 @@ services:
         max-size: "500k"
         max-file: "5"
 
-  # Vouch OIDC server (HTTP, proxied via vouch-proxy for TLS).
+  # Vouch OIDC server (HTTP on 3000, mTLS on 8443).
+  # TLS cert enables mtls_endpoint_aliases in discovery and the mTLS listener.
+  # VOUCH_TLS_CERT/KEY expect base64-encoded PEM content (set via env_file).
   vouch:
     build:
       context: ${VOUCH_REPO_PATH:-../vouch}
     ports:
-      - "3000:3000"
+      - "3000:80"
+    env_file:
+      - path: certs/vouch-tls.env
+        required: false
     environment:
       VOUCH_LISTEN_ADDR: "0.0.0.0:3000"
       VOUCH_BASE_URL: "https://vouch-proxy"
@@ -67,6 +72,7 @@ services:
       VOUCH_SSH_CA_KEY_PATH: ""
       VOUCH_DATABASE_URL: "sqlite:/data/vouch.db?mode=rwc"
       VOUCH_TRUSTED_PROXIES: "0.0.0.0/0"
+      VOUCH_MTLS_PORT: "8443"
     volumes:
       - vouch-data:/data
     networks:
@@ -78,6 +84,7 @@ services:
       context: ./nginx
     ports:
       - "9443:443"
+      - "9444:8443"
     volumes:
       - ./certs/vouch-proxy.crt:/etc/ssl/certs/vouch-proxy.crt:ro
       - ./certs/vouch-proxy.key:/etc/ssl/private/vouch-proxy.key:ro

@@ -72,6 +72,24 @@ def load_config(
         "{CLIENT2_REG_TOKEN}": json_escape_fragment(
             os.environ.get("CLIENT2_REG_TOKEN", "")
         ),
+        "{MTLS_CERT}": json_escape_fragment(
+            os.environ.get("MTLS_CERT", "")
+        ),
+        "{MTLS_KEY}": json_escape_fragment(
+            os.environ.get("MTLS_KEY", "")
+        ),
+        "{MTLS2_CERT}": json_escape_fragment(
+            os.environ.get("MTLS2_CERT", "")
+        ),
+        "{MTLS2_KEY}": json_escape_fragment(
+            os.environ.get("MTLS2_KEY", "")
+        ),
+        "{TLS_CLIENT_AUTH_SUBJECT_DN}": json_escape_fragment(
+            os.environ.get("TLS_CLIENT_AUTH_SUBJECT_DN", "")
+        ),
+        "{TLS_CLIENT_AUTH_SUBJECT_DN2}": json_escape_fragment(
+            os.environ.get("TLS_CLIENT_AUTH_SUBJECT_DN2", "")
+        ),
     }
     for placeholder, value in substitutions.items():
         raw = raw.replace(placeholder, value)
