@@ -1,9 +1,10 @@
 .PHONY: init build certs up down logs wait clean \
 	restart-vouch vouch-logs \
-	test-oidc-basic test-oidc-implicit test-oidc-hybrid \
-	test-oidc-config test-oidc-dynamic test-oidc-formpost \
+	test-oidc-basic test-oidc-config \
 	test-fapi2 test-fapi2-sp-mtls-mtls test-fapi2-sp-mtls-dpop \
-	test-fapi2-sp-pk-mtls test-fapi2-ms test-fapi2-ms-jarm \
+	test-fapi2-sp-pk-mtls \
+	test-fapi2-ms test-fapi2-ms-jarm \
+	test-fapi2-ms-mtls test-fapi2-ms-mtls-jarm \
 	test-fapi2-all-sp test-fapi2-all-ms test-fapi2-all \
 	test-all rerun-failures
 
@@ -75,38 +76,10 @@ test-oidc-basic:
 		--base-url $(VOUCH_BASE_URL) \
 		--conformance-server $(CONFORMANCE_SERVER)
 
-test-oidc-implicit:
-	python3 $(SCRIPTS)/run.py \
-		--plan oidcc-implicit-certification-test-plan \
-		--config $(CONFIG)/oidcc-implicit.json \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
-
-test-oidc-hybrid:
-	python3 $(SCRIPTS)/run.py \
-		--plan oidcc-hybrid-certification-test-plan \
-		--config $(CONFIG)/oidcc-hybrid.json \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
-
 test-oidc-config:
 	python3 $(SCRIPTS)/run.py \
 		--plan oidcc-config-certification-test-plan \
 		--config $(CONFIG)/oidcc-config.json \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
-
-test-oidc-dynamic:
-	python3 $(SCRIPTS)/run.py \
-		--plan oidcc-dynamic-certification-test-plan \
-		--config $(CONFIG)/oidcc-dynamic.json \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
-
-test-oidc-formpost:
-	python3 $(SCRIPTS)/run.py \
-		--plan oidcc-formpost-basic-certification-test-plan \
-		--config $(CONFIG)/oidcc-formpost-basic.json \
 		--base-url $(VOUCH_BASE_URL) \
 		--conformance-server $(CONFORMANCE_SERVER)
 
@@ -186,12 +159,37 @@ test-fapi2-ms-jarm:
 		--base-url $(VOUCH_BASE_URL) \
 		--conformance-server $(CONFORMANCE_SERVER)
 
+test-fapi2-ms-mtls:
+	@eval "$$(python3 $(SCRIPTS)/register_client.py \
+		--plan fapi2-message-signing-final-test-plan \
+		--config $(CONFIG)/fapi2-ms-mtls.json \
+		--vouch-url $(VOUCH_URL) \
+		--conformance-url $(CONFORMANCE_SERVER))" && \
+	python3 $(SCRIPTS)/run.py \
+		--plan fapi2-message-signing-final-test-plan \
+		--config $(CONFIG)/fapi2-ms-mtls.json \
+		--base-url $(VOUCH_BASE_URL) \
+		--conformance-server $(CONFORMANCE_SERVER)
+
+test-fapi2-ms-mtls-jarm:
+	@eval "$$(python3 $(SCRIPTS)/register_client.py \
+		--plan fapi2-message-signing-final-test-plan \
+		--config $(CONFIG)/fapi2-ms-mtls-jarm.json \
+		--vouch-url $(VOUCH_URL) \
+		--conformance-url $(CONFORMANCE_SERVER))" && \
+	python3 $(SCRIPTS)/run.py \
+		--plan fapi2-message-signing-final-test-plan \
+		--config $(CONFIG)/fapi2-ms-mtls-jarm.json \
+		--base-url $(VOUCH_BASE_URL) \
+		--conformance-server $(CONFORMANCE_SERVER)
+
 # -- FAPI 2.0 grouping targets ------------------------------------------------
 
 test-fapi2-all-sp: test-fapi2-sp-mtls-mtls test-fapi2-sp-mtls-dpop \
 	test-fapi2-sp-pk-mtls test-fapi2
 
-test-fapi2-all-ms: test-fapi2-ms test-fapi2-ms-jarm
+test-fapi2-all-ms: test-fapi2-ms test-fapi2-ms-jarm \
+	test-fapi2-ms-mtls test-fapi2-ms-mtls-jarm
 
 test-fapi2-all: test-fapi2-all-sp test-fapi2-all-ms
 
@@ -217,5 +215,4 @@ rerun-failures:
 
 # -- Run all -------------------------------------------------------------------
 
-test-all: test-oidc-basic test-oidc-implicit test-oidc-hybrid \
-	test-oidc-config test-oidc-dynamic test-oidc-formpost test-fapi2-all
+test-all: test-oidc-basic test-oidc-config test-fapi2-all

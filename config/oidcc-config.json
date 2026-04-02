@@ -1,9 +1,6 @@
 {
   "description": "Vouch {VERSION} OIDC Config OP",
-  "variant": {
-    "server_metadata": "discovery",
-    "client_registration": "dynamic_client"
-  },
+  "variant": {},
   "server": {
     "discoveryUrl": "{BASEURL}/.well-known/openid-configuration"
   },
