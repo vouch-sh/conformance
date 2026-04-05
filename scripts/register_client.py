@@ -125,6 +125,7 @@ def build_payload(
     client_auth_type: str = "private_key_jwt",
     sender_constrain: str = "dpop",
     subject_dn: str = "",
+    fapi_request_method: str = "",
 ) -> dict:
     callback = (
         f"{conformance_base_url}/test/a/{client_alias}/callback"
@@ -168,6 +169,9 @@ def build_payload(
         payload["dpop_bound_access_tokens"] = True
     elif sender_constrain == "mtls":
         payload["tls_client_certificate_bound_access_tokens"] = True
+
+    if fapi_request_method == "signed_non_repudiation":
+        payload["request_object_signing_alg"] = "ES256"
 
     return payload
 
@@ -235,6 +239,7 @@ def main() -> None:
     variant = parse_variant(raw)
     client_auth_type = variant.get("client_auth_type", "private_key_jwt")
     sender_constrain = variant.get("sender_constrain", "dpop")
+    fapi_request_method = variant.get("fapi_request_method", "")
     needs_mtls = (
         client_auth_type == "mtls" or sender_constrain == "mtls"
     )
@@ -262,6 +267,7 @@ def main() -> None:
         client_auth_type=client_auth_type,
         sender_constrain=sender_constrain,
         subject_dn=subject_dn,
+        fapi_request_method=fapi_request_method,
     )
     response = post_dcr(args.vouch_url, payload)
     print(
@@ -316,6 +322,7 @@ def main() -> None:
             client_auth_type=client_auth_type,
             sender_constrain=sender_constrain,
             subject_dn=subject_dn2,
+            fapi_request_method=fapi_request_method,
         )
         response2 = post_dcr(args.vouch_url, payload2)
         print(
