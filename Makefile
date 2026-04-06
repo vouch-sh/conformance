@@ -30,8 +30,8 @@ certs:
 			2>/dev/null && \
 		echo "Generated certs/vouch-proxy.crt"
 	@test -f certs/vouch-tls.env || { \
-		echo "VOUCH_TLS_CERT=$$(base64 < certs/vouch-proxy.crt)" > certs/vouch-tls.env && \
-		echo "VOUCH_TLS_KEY=$$(base64 < certs/vouch-proxy.key)" >> certs/vouch-tls.env && \
+		echo "VOUCH_TLS_CERT=$$(base64 < certs/vouch-proxy.crt | tr -d '\n')" > certs/vouch-tls.env && \
+		echo "VOUCH_TLS_KEY=$$(base64 < certs/vouch-proxy.key | tr -d '\n')" >> certs/vouch-tls.env && \
 		echo "Generated certs/vouch-tls.env"; \
 	}
 
