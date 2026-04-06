@@ -92,11 +92,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          uv python install 3.13
-          echo "$(uv python find 3.13 | xargs dirname)" >> "$GITHUB_PATH"
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+        with:
+          python-version: '3.14'
 
       - name: Determine vouch image
         id: image
