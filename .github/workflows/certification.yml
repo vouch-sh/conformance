@@ -166,17 +166,13 @@ jobs:
             sleep 2
           done
 
-      - name: Install cryptography for DCR
-        if: matrix.needs_dcr
-        run: uv pip install --system --quiet cryptography
-
       - name: Register OAuth clients via DCR
         if: matrix.needs_dcr
         env:
           PLAN: ${{ matrix.plan }}
           CONFIG: ${{ matrix.config }}
         run: |
-          python3 scripts/register_client.py \
+          uv run --with cryptography scripts/register_client.py \
             --plan "$PLAN" \
             --config "$CONFIG" \
             --vouch-url https://localhost \
@@ -196,7 +192,7 @@ jobs:
           fi
 
           # shellcheck disable=SC2086
-          python3 scripts/run.py \
+          uv run scripts/run.py \
             --plan "$PLAN" \
             --config "$CONFIG" \
             --base-url "https://ci.vouch.sh" \
