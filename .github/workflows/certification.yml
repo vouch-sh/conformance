@@ -28,7 +28,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  EC2_INSTANCE_ID: i-09fbff5b790426b50
+  EC2_INSTANCE_ID: ${{ vars.GHA_RUNNER_INSTANCE_ID }}
 
 concurrency:
   group: certification
