@@ -16,13 +16,12 @@ on:
   workflow_dispatch:
     inputs:
       image:
-        description: 'GHCR image to test (e.g., ghcr.io/vouch-sh/vouch:2026.4.2). Leave empty to build from source.'
+        description: 'GHCR image to test (e.g., ghcr.io/vouch-sh/vouch:2026.4.2). Defaults to latest release.'
         required: false
         type: string
       vouch_ref:
-        description: 'Vouch repo ref to build from (default: main). Ignored when image is set.'
+        description: 'Vouch repo ref to build from (e.g., main). Leave empty to use latest release image.'
         required: false
-        default: 'main'
         type: string
 
 permissions:
@@ -132,13 +131,17 @@ jobs:
         env:
           INPUT_IMAGE: ${{ github.event.inputs.image || '' }}
           DISPATCH_IMAGE: ${{ github.event.client_payload.image || '' }}
+          VOUCH_REF: ${{ github.event.inputs.vouch_ref || '' }}
         run: |
           IMAGE="${INPUT_IMAGE:-$DISPATCH_IMAGE}"
           if [ -n "$IMAGE" ]; then
             echo "mode=pull" >> "$GITHUB_OUTPUT"
             echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
-          else
+          elif [ -n "$VOUCH_REF" ]; then
             echo "mode=build" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=pull" >> "$GITHUB_OUTPUT"
+            echo "image=ghcr.io/vouch-sh/vouch:latest" >> "$GITHUB_OUTPUT"
           fi
 
       # Pull mode: create a thin Dockerfile wrapper around the pre-built image.
