@@ -236,11 +236,11 @@ jobs:
           PLAN: ${{ matrix.plan }}
           CONFIG: ${{ matrix.config }}
         run: |
-          eval "$(python3 scripts/register_client.py \
+          python3 scripts/register_client.py \
             --plan "$PLAN" \
             --config "$CONFIG" \
             --vouch-url https://localhost:9443 \
-            --conformance-url https://localhost.emobix.co.uk:8443)"
+            --conformance-url https://localhost.emobix.co.uk:8443
 
       - name: Run conformance tests
         env:

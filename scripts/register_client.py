@@ -21,6 +21,7 @@ import argparse
 import base64
 import datetime
 import json
+import os
 import re
 import ssl
 import sys
@@ -196,9 +197,15 @@ def post_dcr(vouch_url: str, payload: dict) -> dict:
 
 
 def shell_export(env: dict[str, str]) -> None:
-    """Print shell-evaluable export statements."""
+    """Export variables via $GITHUB_ENV when in CI, else print shell exports."""
+    github_env = os.environ.get("GITHUB_ENV")
+    if github_env:
+        with open(github_env, "a") as f:
+            for k, v in env.items():
+                # Use heredoc delimiter for values with newlines or quotes.
+                f.write(f"{k}<<__EOF__\n{v}\n__EOF__\n")
+        return
     for k, v in env.items():
-        # Shell-safe quoting: single quotes, escape any embedded ones.
         safe = v.replace("'", "'\\''")
         print(f"export {k}='{safe}'")
 
