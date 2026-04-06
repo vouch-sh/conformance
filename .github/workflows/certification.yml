@@ -248,6 +248,7 @@ jobs:
           PLAN: ${{ matrix.plan }}
           CONFIG: ${{ matrix.config }}
           TLS_PORT: ${{ steps.tunnel.outputs.tls_port }}
+          MTLS_PORT: ${{ steps.tunnel.outputs.mtls_port }}
           PUBLISH: ${{ github.event.inputs.publish }}
         run: |
           PUBLISH_ARG=""
@@ -260,6 +261,7 @@ jobs:
             --plan "$PLAN" \
             --config "$CONFIG" \
             --base-url "https://bore.pub:${TLS_PORT}" \
+            --mtls-base-url "https://bore.pub:${MTLS_PORT}" \
             --conformance-server https://www.certification.openid.net \
             --verify-ssl \
             $PUBLISH_ARG

@@ -55,6 +55,7 @@ def load_config(
     client_secret: str,
     client_jwks: str,
     version: str = "",
+    mtls_base_url: str = "",
 ) -> tuple[dict, dict | None]:
     """Load config template, substitute placeholders, extract variant."""
     raw = config_path.read_text()
@@ -65,8 +66,10 @@ def load_config(
     client2_id = os.environ.get("CLIENT2_ID", "")
     client2_jwks = os.environ.get("CLIENT2_JWKS", "")
 
+    resolved_mtls_base_url = (mtls_base_url or base_url).rstrip("/")
     substitutions = {
         "{BASEURL}": json_escape_fragment(base_url.rstrip("/")),
+        "{MTLS_BASEURL}": json_escape_fragment(resolved_mtls_base_url),
         "{CLIENT_ID}": json_escape_fragment(client_id),
         "{CLIENT_SECRET}": json_escape_fragment(client_secret),
         "{CLIENT_JWKS}": client_jwks or "null",
@@ -344,6 +347,7 @@ def cmd_rerun_failures(
         args.client_secret,
         args.client_jwks,
         version=args.version,
+        mtls_base_url=args.mtls_base_url,
     )
 
     success = run_plan(
@@ -382,6 +386,11 @@ def main() -> None:
         "--base-url",
         default="https://vouch-proxy",
         help="Vouch server base URL as seen by the conformance suite",
+    )
+    parser.add_argument(
+        "--mtls-base-url",
+        default="",
+        help="mTLS resource endpoint base URL (defaults to --base-url)",
     )
     parser.add_argument(
         "--conformance-server",
@@ -480,6 +489,7 @@ def main() -> None:
         args.client_secret,
         args.client_jwks,
         version=args.version,
+        mtls_base_url=args.mtls_base_url,
     )
 
     if args.publish:

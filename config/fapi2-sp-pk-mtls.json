@@ -21,7 +21,7 @@
     "key": "{MTLS_KEY}"
   },
   "resource": {
-    "resourceUrl": "{BASEURL}/oauth/userinfo"
+    "resourceUrl": "{MTLS_BASEURL}/oauth/userinfo"
   },
   "client2": {
     "client_id": "{CLIENT2_ID}",
