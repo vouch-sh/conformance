@@ -57,24 +57,9 @@ jobs:
           aws ec2 start-instances --instance-ids "$EC2_INSTANCE_ID"
           echo "Waiting for instance to be running..."
           aws ec2 wait instance-running --instance-ids "$EC2_INSTANCE_ID"
-          echo "Instance is running"
-
-      - name: Wait for runner to come online
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          for i in $(seq 30); do
-            STATUS=$(gh api repos/${{ github.repository }}/actions/runners \
-              --jq '.runners[] | select(.name == "ci-runner") | .status' 2>/dev/null || echo "unknown")
-            if [ "$STATUS" = "online" ]; then
-              echo "Runner is online"
-              exit 0
-            fi
-            echo "Runner status: ${STATUS} (attempt ${i}/30)"
-            sleep 10
-          done
-          echo "ERROR: Runner did not come online in time"
-          exit 1
+          echo "Instance is running, waiting for runner agent to start..."
+          aws ec2 wait instance-status-ok --instance-ids "$EC2_INSTANCE_ID"
+          echo "Instance status checks passed"
 
   certify:
     name: ${{ matrix.label }}
