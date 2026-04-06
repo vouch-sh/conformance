@@ -39,7 +39,19 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
+      - name: Get conformance suite commit
+        id: suite-commit
+        run: echo "sha=$(git rev-parse HEAD:conformance-suite)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache conformance suite JAR
+        id: jar-cache
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: conformance-suite/target/fapi-test-suite.jar
+          key: conformance-jar-${{ steps.suite-commit.outputs.sha }}
+
       - name: Cache Maven repository
+        if: steps.jar-cache.outputs.cache-hit != 'true'
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: m2
@@ -47,6 +59,7 @@ jobs:
           restore-keys: maven-
 
       - name: Build conformance suite JAR
+        if: steps.jar-cache.outputs.cache-hit != 'true'
         run: |
           cd conformance-suite && \
           MAVEN_CACHE=../m2 docker compose -f builder-compose.yml run --rm \
