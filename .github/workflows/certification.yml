@@ -1,0 +1,268 @@
+name: Certification
+
+# Runs conformance tests against the public certification.openid.net server
+# using a bore.pub TCP tunnel to expose the local vouch instance.
+#
+# Vouch handles TLS natively; bore tunnels the raw TCP connection so the
+# conformance suite's TLS handshake reaches vouch directly.
+#
+# Required secrets:
+#   CONFORMANCE_TOKEN              — API token from certification.openid.net
+#   VOUCH_CERTIFICATION_TEST_TOKEN — Shared secret for automated login
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: 'GHCR image to test (e.g., ghcr.io/vouch-sh/vouch:2026.4.2). Defaults to latest release.'
+        required: false
+        type: string
+      publish:
+        description: 'Publish results to certification.openid.net'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: certification
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    name: ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # OIDC Certification
+          - label: OIDC Basic OP
+            plan: oidcc-basic-certification-test-plan
+            config: config/oidcc-basic.json
+            needs_dcr: false
+          - label: OIDC Config OP
+            plan: oidcc-config-certification-test-plan
+            config: config/oidcc-config.json
+            needs_dcr: false
+          # FAPI 2.0 Security Profile
+          - label: FAPI2SP PK+DPoP
+            plan: fapi2-security-profile-final-test-plan
+            config: config/fapi2-security-profile.json
+            needs_dcr: true
+          - label: FAPI2SP MTLS+MTLS
+            plan: fapi2-security-profile-final-test-plan
+            config: config/fapi2-sp-mtls-mtls.json
+            needs_dcr: true
+          - label: FAPI2SP MTLS+DPoP
+            plan: fapi2-security-profile-final-test-plan
+            config: config/fapi2-sp-mtls-dpop.json
+            needs_dcr: true
+          - label: FAPI2SP PK+MTLS
+            plan: fapi2-security-profile-final-test-plan
+            config: config/fapi2-sp-pk-mtls.json
+            needs_dcr: true
+          # FAPI 2.0 Message Signing
+          - label: FAPI2MS JAR
+            plan: fapi2-message-signing-final-test-plan
+            config: config/fapi2-message-signing.json
+            needs_dcr: true
+          - label: FAPI2MS JARM
+            plan: fapi2-message-signing-final-test-plan
+            config: config/fapi2-ms-jarm.json
+            needs_dcr: true
+          - label: FAPI2MS MTLS
+            plan: fapi2-message-signing-final-test-plan
+            config: config/fapi2-ms-mtls.json
+            needs_dcr: true
+          - label: FAPI2MS MTLS+JARM
+            plan: fapi2-message-signing-final-test-plan
+            config: config/fapi2-ms-mtls-jarm.json
+            needs_dcr: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Determine vouch image
+        id: image
+        env:
+          INPUT_IMAGE: ${{ github.event.inputs.image || '' }}
+        run: |
+          IMAGE="${INPUT_IMAGE:-ghcr.io/vouch-sh/vouch:latest}"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull vouch image
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: docker pull "$IMAGE"
+
+      - name: Generate TLS certificate
+        run: |
+          openssl req -x509 -nodes -days 1 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
+            -keyout /tmp/vouch-tls.key -out /tmp/vouch-tls.crt \
+            -subj "/CN=bore.pub" -addext "subjectAltName=DNS:bore.pub" 2>/dev/null
+
+      - name: Start vouch
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+          VOUCH_CERTIFICATION_TEST_TOKEN: ${{ secrets.VOUCH_CERTIFICATION_TEST_TOKEN }}
+        run: |
+          JWT_SECRET=$(openssl rand -hex 32)
+          echo "JWT_SECRET=${JWT_SECRET}" >> "$GITHUB_ENV"
+
+          TLS_CERT=$(base64 < /tmp/vouch-tls.crt | tr -d '\n')
+          TLS_KEY=$(base64 < /tmp/vouch-tls.key | tr -d '\n')
+
+          docker run -d --name vouch \
+            -p 443:443 -p 8443:8443 \
+            -e VOUCH_BASE_URL="https://localhost" \
+            -e VOUCH_RP_ID="localhost" \
+            -e VOUCH_RP_NAME="Vouch Certification" \
+            -e VOUCH_JWT_SECRET="${JWT_SECRET}" \
+            -e VOUCH_CERTIFICATION_TEST_TOKEN="${VOUCH_CERTIFICATION_TEST_TOKEN}" \
+            -e VOUCH_TLS_CERT="${TLS_CERT}" \
+            -e VOUCH_TLS_KEY="${TLS_KEY}" \
+            -e VOUCH_MTLS_PORT="8443" \
+            -e VOUCH_TRUSTED_PROXIES="0.0.0.0/0" \
+            -e VOUCH_DATABASE_URL="sqlite:/data/vouch.db?mode=rwc" \
+            -v vouch-data:/data \
+            "$IMAGE"
+
+      - name: Wait for vouch
+        run: |
+          for i in $(seq 30); do
+            if curl -ksfm 5 https://localhost/health; then
+              echo "Vouch is healthy"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "ERROR: Vouch did not become healthy in time"
+              docker logs vouch
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Install bore
+        run: |
+          curl -fsSL https://github.com/ekzhang/bore/releases/download/v0.6.0/bore-v0.6.0-x86_64-unknown-linux-musl.tar.gz \
+            | tar -xzf - -C /usr/local/bin bore
+
+      - name: Start bore tunnels
+        id: tunnel
+        run: |
+          bore local 443 --to bore.pub 2>&1 | tee /tmp/bore-tls.log &
+          bore local 8443 --to bore.pub 2>&1 | tee /tmp/bore-mtls.log &
+
+          for label in tls mtls; do
+            for i in $(seq 30); do
+              PORT=$(grep -oP 'listening at bore\.pub:\K\d+' "/tmp/bore-${label}.log" | head -1)
+              if [ -n "$PORT" ]; then
+                echo "${label} tunnel: bore.pub:${PORT}"
+                echo "${label}_port=${PORT}" >> "$GITHUB_OUTPUT"
+                break
+              fi
+              if [ "$i" -eq 30 ]; then
+                echo "ERROR: ${label} bore tunnel did not start"
+                cat "/tmp/bore-${label}.log"
+                exit 1
+              fi
+              sleep 2
+            done
+          done
+
+      - name: Restart vouch with tunnel URL
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+          TLS_PORT: ${{ steps.tunnel.outputs.tls_port }}
+          MTLS_PORT: ${{ steps.tunnel.outputs.mtls_port }}
+          VOUCH_CERTIFICATION_TEST_TOKEN: ${{ secrets.VOUCH_CERTIFICATION_TEST_TOKEN }}
+        run: |
+          docker stop vouch && docker rm vouch
+
+          TLS_CERT=$(base64 < /tmp/vouch-tls.crt | tr -d '\n')
+          TLS_KEY=$(base64 < /tmp/vouch-tls.key | tr -d '\n')
+
+          # VOUCH_MTLS_PORT controls both the listener and discovery URLs.
+          # Map host:8443 → container:MTLS_PORT so bore reaches the listener.
+          docker run -d --name vouch \
+            -p 443:443 -p "8443:${MTLS_PORT}" \
+            -e VOUCH_BASE_URL="https://bore.pub:${TLS_PORT}" \
+            -e VOUCH_RP_ID="bore.pub" \
+            -e VOUCH_RP_NAME="Vouch Certification" \
+            -e VOUCH_JWT_SECRET="${JWT_SECRET}" \
+            -e VOUCH_CERTIFICATION_TEST_TOKEN="${VOUCH_CERTIFICATION_TEST_TOKEN}" \
+            -e VOUCH_TLS_CERT="${TLS_CERT}" \
+            -e VOUCH_TLS_KEY="${TLS_KEY}" \
+            -e VOUCH_MTLS_PORT="${MTLS_PORT}" \
+            -e VOUCH_TRUSTED_PROXIES="0.0.0.0/0" \
+            -e VOUCH_DATABASE_URL="sqlite:/data/vouch.db?mode=rwc" \
+            -v vouch-data:/data \
+            "$IMAGE"
+
+          for i in $(seq 20); do
+            if curl -ksfm 5 https://localhost/health; then
+              echo "Vouch restarted with tunnel URL"
+              break
+            fi
+            if [ "$i" -eq 20 ]; then
+              echo "ERROR: Vouch did not restart in time"
+              docker logs vouch
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Install cryptography for DCR
+        if: matrix.needs_dcr
+        run: pip install --quiet cryptography
+
+      - name: Register OAuth clients via DCR
+        if: matrix.needs_dcr
+        env:
+          PLAN: ${{ matrix.plan }}
+          CONFIG: ${{ matrix.config }}
+        run: |
+          python3 scripts/register_client.py \
+            --plan "$PLAN" \
+            --config "$CONFIG" \
+            --vouch-url https://localhost \
+            --conformance-url https://www.certification.openid.net
+
+      - name: Run certification tests
+        env:
+          CONFORMANCE_TOKEN: ${{ secrets.CONFORMANCE_TOKEN }}
+          PLAN: ${{ matrix.plan }}
+          CONFIG: ${{ matrix.config }}
+          TLS_PORT: ${{ steps.tunnel.outputs.tls_port }}
+          PUBLISH: ${{ github.event.inputs.publish }}
+        run: |
+          PUBLISH_ARG=""
+          if [ "$PUBLISH" = "true" ]; then
+            PUBLISH_ARG="--publish"
+          fi
+
+          # shellcheck disable=SC2086
+          python3 scripts/run.py \
+            --plan "$PLAN" \
+            --config "$CONFIG" \
+            --base-url "https://bore.pub:${TLS_PORT}" \
+            --conformance-server https://www.certification.openid.net \
+            --verify-ssl \
+            $PUBLISH_ARG
+
+      - name: Show vouch logs on failure
+        if: failure()
+        run: docker logs vouch 2>&1 | tail -200
