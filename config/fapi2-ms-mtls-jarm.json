@@ -1,5 +1,5 @@
 {
-  "description": "Vouch {VERSION} FAPI 2.0 Message Signing MTLS JARM",
+  "description": "vouch-server/{VERSION} (https://github.com/vouch-sh/vouch)",
   "variant": {
     "openid": "openid_connect",
     "client_auth_type": "mtls",
@@ -25,7 +25,7 @@
     "key": "{MTLS_KEY}"
   },
   "resource": {
-    "resourceUrl": "{BASEURL}:8443/oauth/userinfo"
+    "resourceUrl": "{BASEURL}/oauth/userinfo"
   },
   "client2": {
     "client_id": "{CLIENT2_ID}",
