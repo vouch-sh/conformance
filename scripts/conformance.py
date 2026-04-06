@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0 OR MIT
-"""API client for a local OpenID Foundation conformance suite.
+"""API client for an OpenID Foundation conformance suite.
 
-Expects the conformance suite running in devmode (no auth token required)
-at https://localhost.emobix.co.uk:8443 via Docker Compose.
+Supports both local devmode (no auth token, self-signed certs) and the
+public certification.openid.net (Bearer token, proper SSL).
 """
 
 import json
@@ -35,11 +35,17 @@ def _make_ssl_context() -> ssl.SSLContext:
 
 
 class ConformanceClient:
-    """HTTP client for a local conformance suite instance."""
+    """HTTP client for an OpenID conformance suite instance."""
 
-    def __init__(self, server: str = DEFAULT_SERVER) -> None:
+    def __init__(
+        self,
+        server: str = DEFAULT_SERVER,
+        token: str = "",
+        verify_ssl: bool = False,
+    ) -> None:
         self.server = server.rstrip("/")
-        self._ssl_ctx = _make_ssl_context()
+        self._token = token
+        self._ssl_ctx = None if verify_ssl else _make_ssl_context()
 
     def _get(self, path: str, params: dict | None = None) -> Any:
         return json.loads(self._get_bytes(path, params=params))
@@ -49,6 +55,8 @@ class ConformanceClient:
         if params:
             url = f"{url}?{urllib.parse.urlencode(params)}"
         req = urllib.request.Request(url)
+        if self._token:
+            req.add_header("Authorization", f"Bearer {self._token}")
         try:
             with urllib.request.urlopen(
                 req, context=self._ssl_ctx
@@ -66,6 +74,8 @@ class ConformanceClient:
         if params:
             url = f"{url}?{urllib.parse.urlencode(params)}"
         headers: dict[str, str] = {}
+        if self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
         data: bytes | None = None
         if body is not None:
             data = json.dumps(body).encode()
@@ -143,6 +153,15 @@ class ConformanceClient:
     def get_module_log(self, module_id: str) -> list[dict[str, Any]]:
         """Fetch the full structured log for a test module."""
         return self._get(f"/api/log/{module_id}")
+
+    def create_certification_package(self, plan_id: str) -> dict[str, Any]:
+        """Create a formal certification package for a completed plan."""
+        log.info("Creating certification package for plan %s", plan_id)
+        return self._post(f"/api/plan/{plan_id}/certificationpackage")
+
+    def export_plan_html(self, plan_id: str) -> bytes:
+        """Download the plan results as an HTML report."""
+        return self._get_bytes(f"/api/plan/exporthtml/{plan_id}")
 
     def wait_for_state(
         self,

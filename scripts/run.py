@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0 OR MIT
-"""Run OpenID conformance test plan(s) against a local Vouch server.
+"""Run OpenID conformance test plan(s) against a Vouch server.
+
+Supports both local devmode and the public certification.openid.net.
 
 Optimized for AI iteration:
   - Auto-dumps detailed failure logs (HTTP exchanges, assertions, RFC refs)
@@ -9,20 +11,25 @@ Optimized for AI iteration:
   - Supports rerunning only failures from the last run with --rerun-failures
 
 Usage:
-    # Run a full plan
-    python3 run.py --plan oidcc-basic-certification-test-plan \
+    # Run a full plan (local)
+    python3 run.py --plan oidcc-basic-certification-test-plan \\
         --config config/oidcc-basic.json
 
-    # Run a single module in a new plan
-    python3 run.py --plan oidcc-basic-certification-test-plan \
-        --config config/oidcc-basic.json \
-        --module oidcc-server-rotate-keys
+    # Run against certification.openid.net with publishing
+    python3 run.py --plan oidcc-basic-certification-test-plan \\
+        --config config/oidcc-basic.json \\
+        --conformance-server https://www.certification.openid.net/ \\
+        --publish
 
     # Rerun only failures from the last run
     python3 run.py --rerun-failures
 
     # Get detailed logs for a module from the last run
     python3 run.py --logs <module-id>
+
+Environment variables:
+    CONFORMANCE_SERVER   Base URL of the conformance server
+    CONFORMANCE_TOKEN    Bearer token for the conformance API
 """
 
 import argparse
@@ -179,11 +186,18 @@ def run_plan(
     variant: dict | None,
     parallel: int,
     conformance_server: str,
+    conformance_token: str,
     module_timeout: int,
+    verify_ssl: bool = False,
+    publish: bool = False,
     only_modules: list[str] | None = None,
 ) -> bool:
     """Run all modules in a test plan. Returns True if all passed."""
-    client = ConformanceClient(server=conformance_server)
+    client = ConformanceClient(
+        server=conformance_server,
+        token=conformance_token,
+        verify_ssl=verify_ssl,
+    )
 
     plan_id = client.create_test_plan(plan_name, config, variant)
     log.info("Plan ID: %s", plan_id)
@@ -253,14 +267,28 @@ def run_plan(
 
     any_failed = len(failed) > 0
 
+    if publish and not any_failed:
+        try:
+            pkg = client.create_certification_package(plan_id)
+            log.info("Certification package created: %s", pkg)
+        except ConformanceError as e:
+            log.warning("Failed to create certification package: %s", e)
+
     print_summary(results, plan_id, conformance_server)
     return not any_failed
 
 
-def cmd_logs(args: argparse.Namespace) -> None:
+def cmd_logs(
+    args: argparse.Namespace,
+    conformance_token: str,
+) -> None:
     """Fetch and display logs for a module ID."""
     state = load_state()
-    client = ConformanceClient(server=state["conformance_server"])
+    client = ConformanceClient(
+        server=state["conformance_server"],
+        token=conformance_token,
+        verify_ssl=getattr(args, "verify_ssl", False),
+    )
 
     module_id = args.logs
 
@@ -280,7 +308,10 @@ def cmd_logs(args: argparse.Namespace) -> None:
     print(output)
 
 
-def cmd_rerun_failures(args: argparse.Namespace) -> None:
+def cmd_rerun_failures(
+    args: argparse.Namespace,
+    conformance_token: str,
+) -> None:
     """Rerun failed modules from the last run in a new plan."""
     state = load_state()
     failed = [
@@ -321,7 +352,9 @@ def cmd_rerun_failures(args: argparse.Namespace) -> None:
         variant=variant,
         parallel=args.parallel,
         conformance_server=args.conformance_server,
+        conformance_token=conformance_token,
         module_timeout=args.module_timeout,
+        verify_ssl=args.verify_ssl,
         only_modules=failed,
     )
     sys.exit(0 if success else 1)
@@ -352,8 +385,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--conformance-server",
-        default="https://localhost.emobix.co.uk:8443",
-        help="Conformance suite API URL",
+        default=os.environ.get(
+            "CONFORMANCE_SERVER",
+            "https://localhost.emobix.co.uk:8443",
+        ).rstrip("/"),
+        help="Conformance suite API URL (or set CONFORMANCE_SERVER env var)",
     )
     parser.add_argument(
         "--client-id",
@@ -392,6 +428,16 @@ def main() -> None:
         action="append",
         help="Run only this module (can be repeated)",
     )
+    parser.add_argument(
+        "--publish",
+        action="store_true",
+        help="Create a formal certification package if all tests pass",
+    )
+    parser.add_argument(
+        "--verify-ssl",
+        action="store_true",
+        help="Verify SSL certificates (use for certification.openid.net)",
+    )
 
     # Iteration helpers.
     parser.add_argument(
@@ -412,13 +458,15 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    conformance_token = os.environ.get("CONFORMANCE_TOKEN", "")
+
     # Dispatch to sub-commands.
     if args.logs:
-        cmd_logs(args)
+        cmd_logs(args, conformance_token)
         return
 
     if args.rerun_failures:
-        cmd_rerun_failures(args)
+        cmd_rerun_failures(args, conformance_token)
         return
 
     # Normal run requires --plan and --config.
@@ -434,13 +482,19 @@ def main() -> None:
         version=args.version,
     )
 
+    if args.publish:
+        config["publish"] = "everything"
+
     success = run_plan(
         plan_name=args.plan,
         config=config,
         variant=variant,
         parallel=args.parallel,
         conformance_server=args.conformance_server,
+        conformance_token=conformance_token,
         module_timeout=args.module_timeout,
+        verify_ssl=args.verify_ssl,
+        publish=args.publish,
         only_modules=args.module,
     )
 

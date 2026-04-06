@@ -1,0 +1,243 @@
+name: Conformance Tests
+
+# Runs the full OpenID conformance suite (OIDC + FAPI2) against Vouch
+# using the local Docker Compose setup with proper TLS and mTLS.
+#
+# Triggered by:
+#   - Push to main (builds vouch from source)
+#   - Release dispatch from vouch repo (pulls pre-built GHCR image)
+#   - Manual dispatch (either mode)
+
+on:
+  push:
+    branches: [main]
+  repository_dispatch:
+    types: [release]
+  workflow_dispatch:
+    inputs:
+      image:
+        description: 'GHCR image to test (e.g., ghcr.io/vouch-sh/vouch:2026.4.2). Leave empty to build from source.'
+        required: false
+        type: string
+      vouch_ref:
+        description: 'Vouch repo ref to build from (default: main). Ignored when image is set.'
+        required: false
+        default: 'main'
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  build-suite:
+    name: Build Conformance Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Cache Maven repository
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: m2
+          key: maven-${{ hashFiles('conformance-suite/pom.xml') }}
+          restore-keys: maven-
+
+      - name: Build conformance suite JAR
+        run: |
+          cd conformance-suite && \
+          MAVEN_CACHE=../m2 docker compose -f builder-compose.yml run --rm \
+            builder mvn -B clean package -DskipTests=true -Dmaven.gitcommitid.skip=true
+
+      - name: Upload conformance suite JAR
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: conformance-suite-jar
+          path: conformance-suite/target/fapi-test-suite.jar
+          if-no-files-found: error
+          retention-days: 1
+
+  test:
+    name: ${{ matrix.label }}
+    needs: build-suite
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # OIDC Certification
+          - label: OIDC Basic OP
+            plan: oidcc-basic-certification-test-plan
+            config: config/oidcc-basic.json
+            needs_dcr: false
+          - label: OIDC Config OP
+            plan: oidcc-config-certification-test-plan
+            config: config/oidcc-config.json
+            needs_dcr: false
+          # FAPI 2.0 Security Profile
+          - label: FAPI2SP PK+DPoP
+            plan: fapi2-security-profile-final-test-plan
+            config: config/fapi2-security-profile.json
+            needs_dcr: true
+          - label: FAPI2SP MTLS+MTLS
+            plan: fapi2-security-profile-final-test-plan
+            config: config/fapi2-sp-mtls-mtls.json
+            needs_dcr: true
+          - label: FAPI2SP MTLS+DPoP
+            plan: fapi2-security-profile-final-test-plan
+            config: config/fapi2-sp-mtls-dpop.json
+            needs_dcr: true
+          - label: FAPI2SP PK+MTLS
+            plan: fapi2-security-profile-final-test-plan
+            config: config/fapi2-sp-pk-mtls.json
+            needs_dcr: true
+          # FAPI 2.0 Message Signing
+          - label: FAPI2MS JAR
+            plan: fapi2-message-signing-final-test-plan
+            config: config/fapi2-message-signing.json
+            needs_dcr: true
+          - label: FAPI2MS JARM
+            plan: fapi2-message-signing-final-test-plan
+            config: config/fapi2-ms-jarm.json
+            needs_dcr: true
+          - label: FAPI2MS MTLS
+            plan: fapi2-message-signing-final-test-plan
+            config: config/fapi2-ms-mtls.json
+            needs_dcr: true
+          - label: FAPI2MS MTLS+JARM
+            plan: fapi2-message-signing-final-test-plan
+            config: config/fapi2-ms-mtls-jarm.json
+            needs_dcr: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Download conformance suite JAR
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: conformance-suite-jar
+          path: conformance-suite/target
+
+      # Determine whether to pull a pre-built image or build from source.
+      - name: Determine vouch image source
+        id: source
+        env:
+          INPUT_IMAGE: ${{ github.event.inputs.image || '' }}
+          DISPATCH_IMAGE: ${{ github.event.client_payload.image || '' }}
+        run: |
+          IMAGE="${INPUT_IMAGE:-$DISPATCH_IMAGE}"
+          if [ -n "$IMAGE" ]; then
+            echo "mode=pull" >> "$GITHUB_OUTPUT"
+            echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=build" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Pull mode: create a thin Dockerfile wrapper around the pre-built image.
+      - name: Log in to GHCR
+        if: steps.source.outputs.mode == 'pull'
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare pre-built image context
+        if: steps.source.outputs.mode == 'pull'
+        env:
+          IMAGE: ${{ steps.source.outputs.image }}
+        run: |
+          mkdir -p vouch-image
+          echo "FROM ${IMAGE}" > vouch-image/Dockerfile
+
+      # Build mode: checkout vouch source.
+      - name: Checkout vouch source
+        if: steps.source.outputs.mode == 'build'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: vouch-sh/vouch
+          ref: ${{ github.event.inputs.vouch_ref || 'main' }}
+          path: vouch-src
+          persist-credentials: false
+
+      - name: Generate certificates
+        run: make certs
+
+      - name: Start services
+        env:
+          VOUCH_REPO_PATH: ${{ steps.source.outputs.mode == 'pull' && './vouch-image' || './vouch-src' }}
+        run: docker compose up -d --build
+
+      - name: Wait for services
+        run: |
+          echo "Waiting for conformance suite..."
+          for i in $(seq 60); do
+            if curl -ksfm 5 https://localhost.emobix.co.uk:8443/ >/dev/null 2>&1; then
+              echo "Conformance suite is ready"
+              break
+            fi
+            if [ "$i" -eq 60 ]; then
+              echo "ERROR: Conformance suite did not start in time"
+              docker compose logs server nginx
+              exit 1
+            fi
+            sleep 5
+          done
+
+          echo "Waiting for vouch..."
+          for i in $(seq 30); do
+            if curl -ksfm 5 https://localhost:9443/health >/dev/null 2>&1; then
+              echo "Vouch is ready"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "ERROR: Vouch did not become healthy in time"
+              docker compose logs vouch
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Install cryptography for DCR
+        if: matrix.needs_dcr
+        run: pip install --quiet cryptography
+
+      - name: Register OAuth clients via DCR
+        if: matrix.needs_dcr
+        env:
+          PLAN: ${{ matrix.plan }}
+          CONFIG: ${{ matrix.config }}
+        run: |
+          eval "$(python3 scripts/register_client.py \
+            --plan "$PLAN" \
+            --config "$CONFIG" \
+            --vouch-url https://localhost:9443 \
+            --conformance-url https://localhost.emobix.co.uk:8443 \
+            --no-verify-ssl)"
+
+      - name: Run conformance tests
+        env:
+          PLAN: ${{ matrix.plan }}
+          CONFIG: ${{ matrix.config }}
+        run: |
+          python3 scripts/run.py \
+            --plan "$PLAN" \
+            --config "$CONFIG" \
+            --base-url https://vouch-proxy \
+            --conformance-server https://localhost.emobix.co.uk:8443
+
+      - name: Show vouch logs on failure
+        if: failure()
+        run: docker compose logs vouch 2>&1 | tail -200
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v
