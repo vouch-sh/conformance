@@ -196,12 +196,21 @@ def post_dcr(vouch_url: str, payload: dict) -> dict:
         return json.loads(resp.read())
 
 
+SENSITIVE_KEYS = {
+    "CLIENT_SECRET", "CLIENT_JWKS", "CLIENT2_JWKS",
+    "MTLS_CERT", "MTLS_KEY", "MTLS2_CERT", "MTLS2_KEY",
+    "CLIENT_REG_TOKEN", "CLIENT2_REG_TOKEN",
+}
+
+
 def shell_export(env: dict[str, str]) -> None:
     """Export variables via $GITHUB_ENV when in CI, else print shell exports."""
     github_env = os.environ.get("GITHUB_ENV")
     if github_env:
         with open(github_env, "a") as f:
             for k, v in env.items():
+                if k in SENSITIVE_KEYS and v:
+                    print(f"::add-mask::{v}")
                 # Use heredoc delimiter for values with newlines or quotes.
                 f.write(f"{k}<<__EOF__\n{v}\n__EOF__\n")
         return
