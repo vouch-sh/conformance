@@ -4,9 +4,14 @@ name: Certification
 # using a self-hosted runner at ci.vouch.sh with ports 443 (TLS) and
 # 8443 (mTLS) open to the internet.
 #
+# The EC2 instance is started before tests and stopped after, so it only
+# runs (and costs money) during certification.
+#
 # Required secrets:
 #   CONFORMANCE_TOKEN              — API token from certification.openid.net
 #   VOUCH_CERTIFICATION_TEST_TOKEN — Shared secret for automated login
+# Required variables:
+#   ASSUME_ROLE_ARN                — IAM role ARN for OIDC federation
 
 on:
   workflow_dispatch:
@@ -21,6 +26,10 @@ on:
         default: false
         type: boolean
 
+env:
+  AWS_REGION: us-east-1
+  EC2_INSTANCE_ID: i-09fbff5b790426b50
+
 concurrency:
   group: certification
   cancel-in-progress: true
@@ -28,10 +37,48 @@ concurrency:
 permissions:
   contents: read
   packages: read
+  id-token: write
 
 jobs:
+  start-runner:
+    name: Start EC2 runner
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ vars.ASSUME_ROLE_ARN }}
+          role-session-name: ci
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - name: Start EC2 instance
+        run: |
+          aws ec2 start-instances --instance-ids "$EC2_INSTANCE_ID"
+          echo "Waiting for instance to be running..."
+          aws ec2 wait instance-running --instance-ids "$EC2_INSTANCE_ID"
+          echo "Instance is running"
+
+      - name: Wait for runner to come online
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for i in $(seq 30); do
+            STATUS=$(gh api repos/${{ github.repository }}/actions/runners \
+              --jq '.runners[] | select(.name == "ci-runner") | .status' 2>/dev/null || echo "unknown")
+            if [ "$STATUS" = "online" ]; then
+              echo "Runner is online"
+              exit 0
+            fi
+            echo "Runner status: ${STATUS} (attempt ${i}/30)"
+            sleep 10
+          done
+          echo "ERROR: Runner did not come online in time"
+          exit 1
+
   certify:
     name: ${{ matrix.label }}
+    needs: start-runner
     runs-on: [self-hosted, Linux, ARM64, conformance]
     strategy:
       fail-fast: false
@@ -211,3 +258,24 @@ jobs:
         run: |
           docker rm -f vouch 2>/dev/null || true
           docker volume rm vouch-data 2>/dev/null || true
+
+  stop-runner:
+    name: Stop EC2 runner
+    needs: certify
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ vars.ASSUME_ROLE_ARN }}
+          role-session-name: ci
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - name: Stop EC2 instance
+        run: |
+          aws ec2 stop-instances --instance-ids "$EC2_INSTANCE_ID"
+          echo "Instance stop initiated"
