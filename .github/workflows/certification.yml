@@ -93,9 +93,10 @@ jobs:
           persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-        with:
-          python-version: '3.14'
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          uv python install 3.13
+          echo "$(uv python find 3.13 | xargs dirname)" >> "$GITHUB_PATH"
 
       - name: Determine vouch image
         id: image
@@ -168,7 +169,7 @@ jobs:
 
       - name: Install cryptography for DCR
         if: matrix.needs_dcr
-        run: pip install --quiet cryptography
+        run: uv pip install --system --quiet cryptography
 
       - name: Register OAuth clients via DCR
         if: matrix.needs_dcr
