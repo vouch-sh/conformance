@@ -154,12 +154,16 @@ jobs:
           if [ -n "$IMAGE" ]; then
             echo "mode=pull" >> "$GITHUB_OUTPUT"
             echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+            VERSION="${IMAGE##*:}"
           elif [ -n "$VOUCH_REF" ]; then
             echo "mode=build" >> "$GITHUB_OUTPUT"
+            VERSION="${VOUCH_REF}"
           else
             echo "mode=pull" >> "$GITHUB_OUTPUT"
             echo "image=ghcr.io/vouch-sh/vouch:latest" >> "$GITHUB_OUTPUT"
+            VERSION="latest"
           fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       # Pull mode: create a thin Dockerfile wrapper around the pre-built image.
       - name: Log in to GHCR
@@ -246,13 +250,15 @@ jobs:
         env:
           PLAN: ${{ matrix.plan }}
           CONFIG: ${{ matrix.config }}
+          VERSION: ${{ steps.source.outputs.version }}
         run: |
           python3 scripts/run.py \
             --plan "$PLAN" \
             --config "$CONFIG" \
             --base-url https://vouch-proxy \
             --mtls-base-url https://vouch-proxy:8443 \
-            --conformance-server https://localhost.emobix.co.uk:8443
+            --conformance-server https://localhost.emobix.co.uk:8443 \
+            --version "$VERSION"
 
       - name: Show vouch logs on failure
         if: failure()

@@ -96,6 +96,8 @@ jobs:
         run: |
           IMAGE="${INPUT_IMAGE:-ghcr.io/vouch-sh/vouch:latest}"
           echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          VERSION="${IMAGE##*:}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
@@ -249,6 +251,7 @@ jobs:
           CONFIG: ${{ matrix.config }}
           TLS_PORT: ${{ steps.tunnel.outputs.tls_port }}
           MTLS_PORT: ${{ steps.tunnel.outputs.mtls_port }}
+          VERSION: ${{ steps.image.outputs.version }}
           PUBLISH: ${{ github.event.inputs.publish }}
         run: |
           PUBLISH_ARG=""
@@ -263,6 +266,7 @@ jobs:
             --base-url "https://bore.pub:${TLS_PORT}" \
             --mtls-base-url "https://bore.pub:${MTLS_PORT}" \
             --conformance-server https://www.certification.openid.net \
+            --version "$VERSION" \
             --verify-ssl \
             $PUBLISH_ARG
 
