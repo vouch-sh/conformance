@@ -1,10 +1,8 @@
 name: Certification
 
 # Runs conformance tests against the public certification.openid.net server
-# using a bore.pub TCP tunnel to expose the local vouch instance.
-#
-# Vouch handles TLS natively; bore tunnels the raw TCP connection so the
-# conformance suite's TLS handshake reaches vouch directly.
+# using a self-hosted runner at ci.vouch.sh with ports 443 (TLS) and
+# 8443 (mTLS) open to the internet.
 #
 # Required secrets:
 #   CONFORMANCE_TOKEN              — API token from certification.openid.net
@@ -34,7 +32,7 @@ permissions:
 jobs:
   certify:
     name: ${{ matrix.label }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, ARM64, conformance]
     strategy:
       fail-fast: false
       matrix:
@@ -84,6 +82,11 @@ jobs:
             needs_dcr: true
 
     steps:
+      - name: Cleanup stale containers
+        run: |
+          docker rm -f vouch 2>/dev/null || true
+          docker volume rm vouch-data 2>/dev/null || true
+
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -115,7 +118,7 @@ jobs:
         run: |
           openssl req -x509 -nodes -days 1 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
             -keyout /tmp/vouch-tls.key -out /tmp/vouch-tls.crt \
-            -subj "/CN=bore.pub" -addext "subjectAltName=DNS:bore.pub" 2>/dev/null
+            -subj "/CN=ci.vouch.sh" -addext "subjectAltName=DNS:ci.vouch.sh" 2>/dev/null
 
       - name: Start vouch
         env:
@@ -130,8 +133,8 @@ jobs:
 
           docker run -d --name vouch \
             -p 443:443 -p 8443:8443 \
-            -e VOUCH_BASE_URL="https://localhost" \
-            -e VOUCH_RP_ID="localhost" \
+            -e VOUCH_BASE_URL="https://ci.vouch.sh" \
+            -e VOUCH_RP_ID="ci.vouch.sh" \
             -e VOUCH_RP_NAME="Vouch Certification" \
             -e VOUCH_JWT_SECRET="${JWT_SECRET}" \
             -e VOUCH_CERTIFICATION_TEST_TOKEN="${VOUCH_CERTIFICATION_TEST_TOKEN}" \
@@ -152,76 +155,6 @@ jobs:
             fi
             if [ "$i" -eq 30 ]; then
               echo "ERROR: Vouch did not become healthy in time"
-              docker logs vouch
-              exit 1
-            fi
-            sleep 2
-          done
-
-      - name: Install bore
-        run: |
-          curl -fsSL https://github.com/ekzhang/bore/releases/download/v0.6.0/bore-v0.6.0-x86_64-unknown-linux-musl.tar.gz \
-            | tar -xzf - -C /usr/local/bin bore
-
-      - name: Start bore tunnels
-        id: tunnel
-        run: |
-          bore local 443 --to bore.pub 2>&1 | tee /tmp/bore-tls.log &
-          bore local 8443 --to bore.pub 2>&1 | tee /tmp/bore-mtls.log &
-
-          for label in tls mtls; do
-            for i in $(seq 30); do
-              PORT=$(grep -oP 'listening at bore\.pub:\K\d+' "/tmp/bore-${label}.log" | head -1)
-              if [ -n "$PORT" ]; then
-                echo "${label} tunnel: bore.pub:${PORT}"
-                echo "${label}_port=${PORT}" >> "$GITHUB_OUTPUT"
-                break
-              fi
-              if [ "$i" -eq 30 ]; then
-                echo "ERROR: ${label} bore tunnel did not start"
-                cat "/tmp/bore-${label}.log"
-                exit 1
-              fi
-              sleep 2
-            done
-          done
-
-      - name: Restart vouch with tunnel URL
-        env:
-          IMAGE: ${{ steps.image.outputs.image }}
-          TLS_PORT: ${{ steps.tunnel.outputs.tls_port }}
-          MTLS_PORT: ${{ steps.tunnel.outputs.mtls_port }}
-          VOUCH_CERTIFICATION_TEST_TOKEN: ${{ secrets.VOUCH_CERTIFICATION_TEST_TOKEN }}
-        run: |
-          docker stop vouch && docker rm vouch
-
-          TLS_CERT=$(base64 < /tmp/vouch-tls.crt | tr -d '\n')
-          TLS_KEY=$(base64 < /tmp/vouch-tls.key | tr -d '\n')
-
-          # VOUCH_MTLS_PORT controls both the listener and discovery URLs.
-          # Map host:8443 → container:MTLS_PORT so bore reaches the listener.
-          docker run -d --name vouch \
-            -p 443:443 -p "8443:${MTLS_PORT}" \
-            -e VOUCH_BASE_URL="https://bore.pub:${TLS_PORT}" \
-            -e VOUCH_RP_ID="bore.pub" \
-            -e VOUCH_RP_NAME="Vouch Certification" \
-            -e VOUCH_JWT_SECRET="${JWT_SECRET}" \
-            -e VOUCH_CERTIFICATION_TEST_TOKEN="${VOUCH_CERTIFICATION_TEST_TOKEN}" \
-            -e VOUCH_TLS_CERT="${TLS_CERT}" \
-            -e VOUCH_TLS_KEY="${TLS_KEY}" \
-            -e VOUCH_MTLS_PORT="${MTLS_PORT}" \
-            -e VOUCH_TRUSTED_PROXIES="0.0.0.0/0" \
-            -e VOUCH_DATABASE_URL="sqlite:/data/vouch.db?mode=rwc" \
-            -v vouch-data:/data \
-            "$IMAGE"
-
-          for i in $(seq 20); do
-            if curl -ksfm 5 https://localhost/health; then
-              echo "Vouch restarted with tunnel URL"
-              break
-            fi
-            if [ "$i" -eq 20 ]; then
-              echo "ERROR: Vouch did not restart in time"
               docker logs vouch
               exit 1
             fi
@@ -249,8 +182,6 @@ jobs:
           CONFORMANCE_TOKEN: ${{ secrets.CONFORMANCE_TOKEN }}
           PLAN: ${{ matrix.plan }}
           CONFIG: ${{ matrix.config }}
-          TLS_PORT: ${{ steps.tunnel.outputs.tls_port }}
-          MTLS_PORT: ${{ steps.tunnel.outputs.mtls_port }}
           VERSION: ${{ steps.image.outputs.version }}
           PUBLISH: ${{ github.event.inputs.publish }}
         run: |
@@ -263,8 +194,8 @@ jobs:
           python3 scripts/run.py \
             --plan "$PLAN" \
             --config "$CONFIG" \
-            --base-url "https://bore.pub:${TLS_PORT}" \
-            --mtls-base-url "https://bore.pub:${MTLS_PORT}" \
+            --base-url "https://ci.vouch.sh" \
+            --mtls-base-url "https://ci.vouch.sh:8443" \
             --conformance-server https://www.certification.openid.net \
             --version "$VERSION" \
             --verify-ssl \
@@ -273,3 +204,9 @@ jobs:
       - name: Show vouch logs on failure
         if: failure()
         run: docker logs vouch 2>&1 | tail -200
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f vouch 2>/dev/null || true
+          docker volume rm vouch-data 2>/dev/null || true
