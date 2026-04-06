@@ -29,6 +29,7 @@ concurrency:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   certify:
