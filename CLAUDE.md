@@ -23,9 +23,11 @@ make wait          # Block until conformance suite + vouch are healthy
 OIDC plans use dynamic client registration internally. FAPI 2.0 plans require a separate `register_client.py` step first (the Makefile handles this via `eval`).
 
 ```bash
-# OIDC plans (Vouch only supports code flow — no implicit/hybrid/formpost)
+# OIDC plans
 make test-oidc-basic
 make test-oidc-config
+make test-oidc-dynamic
+make test-oidc-formpost
 
 # FAPI 2.0 Security Profile (registers client, then runs)
 make test-fapi2                 # private_key_jwt + DPoP (default)

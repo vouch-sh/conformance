@@ -78,6 +78,14 @@ jobs:
             plan: oidcc-config-certification-test-plan
             config: config/oidcc-config.json
             needs_dcr: false
+          - label: OIDC Dynamic OP
+            plan: oidcc-dynamic-certification-test-plan
+            config: config/oidcc-dynamic.json
+            needs_dcr: false
+          - label: OIDC Form Post OP
+            plan: oidcc-formpost-basic-certification-test-plan
+            config: config/oidcc-formpost.json
+            needs_dcr: false
           # FAPI 2.0 Security Profile
           - label: FAPI2SP PK+DPoP
             plan: fapi2-security-profile-final-test-plan

@@ -1,6 +1,6 @@
 .PHONY: init build certs up down logs wait clean \
 	restart-vouch vouch-logs \
-	test-oidc-basic test-oidc-config \
+	test-oidc-basic test-oidc-config test-oidc-dynamic test-oidc-formpost \
 	test-fapi2 test-fapi2-sp-mtls-mtls test-fapi2-sp-mtls-dpop \
 	test-fapi2-sp-pk-mtls \
 	test-fapi2-ms test-fapi2-ms-jarm \
@@ -80,6 +80,20 @@ test-oidc-config:
 	python3 $(SCRIPTS)/run.py \
 		--plan oidcc-config-certification-test-plan \
 		--config $(CONFIG)/oidcc-config.json \
+		--base-url $(VOUCH_BASE_URL) \
+		--conformance-server $(CONFORMANCE_SERVER)
+
+test-oidc-dynamic:
+	python3 $(SCRIPTS)/run.py \
+		--plan oidcc-dynamic-certification-test-plan \
+		--config $(CONFIG)/oidcc-dynamic.json \
+		--base-url $(VOUCH_BASE_URL) \
+		--conformance-server $(CONFORMANCE_SERVER)
+
+test-oidc-formpost:
+	python3 $(SCRIPTS)/run.py \
+		--plan oidcc-formpost-basic-certification-test-plan \
+		--config $(CONFIG)/oidcc-formpost.json \
 		--base-url $(VOUCH_BASE_URL) \
 		--conformance-server $(CONFORMANCE_SERVER)
 
@@ -215,4 +229,4 @@ rerun-failures:
 
 # -- Run all -------------------------------------------------------------------
 
-test-all: test-oidc-basic test-oidc-config test-fapi2-all
+test-all: test-oidc-basic test-oidc-config test-oidc-dynamic test-oidc-formpost test-fapi2-all
