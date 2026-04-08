@@ -2,8 +2,7 @@
   "description": "vouch-server/{VERSION} (https://github.com/vouch-sh/vouch)",
   "variant": {
     "server_metadata": "discovery",
-    "client_registration": "dynamic_client",
-    "response_mode": "form_post"
+    "client_registration": "dynamic_client"
   },
   "server": {
     "discoveryUrl": "{BASEURL}/.well-known/openid-configuration"
