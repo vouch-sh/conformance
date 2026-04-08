@@ -14,7 +14,7 @@ The Vouch server source lives outside this repo (default `../vouch`, override wi
 make init          # Initialize git submodules (conformance-suite)
 make certs         # Generate self-signed TLS certs in certs/
 make build         # Build conformance suite JAR via Maven in Docker
-make up            # Start all 5 Docker services
+make up            # Start all 4 Docker services
 make wait          # Block until conformance suite + vouch are healthy
 ```
 
@@ -76,10 +76,9 @@ python3 scripts/run.py --plan <plan-name> --config <config-file> --module <modul
 | mongodb | Conformance suite state | internal |
 | server | OpenID Conformance Suite (Spring Boot, devmode) | internal |
 | nginx | TLS reverse proxy for conformance suite | 8443 |
-| vouch | Vouch OIDC server under test | 3000 (HTTP) |
-| vouch-proxy | TLS + mTLS proxy for vouch | 9443 (TLS), 9444 (mTLS) |
+| vouch | Vouch OIDC server under test | 3000 (HTTP), 9443 (TLS), 9444 (mTLS) |
 
-All services communicate on the `conformance-net` Docker network. The conformance suite reaches Vouch at `https://vouch-proxy` (the Docker-internal hostname).
+All services communicate on the `conformance-net` Docker network. The conformance suite reaches Vouch at `https://vouch` (the Docker-internal hostname).
 
 ### Python Scripts (scripts/)
 
@@ -94,7 +93,7 @@ JSON files with placeholder tokens substituted at runtime by `run.py`:
 
 | Placeholder | Source |
 |-------------|--------|
-| `{BASEURL}` | `--base-url` arg (default `https://vouch-proxy`) |
+| `{BASEURL}` | `--base-url` arg (default `https://vouch`) |
 | `{CLIENT_ID}`, `{CLIENT_SECRET}` | From `register_client.py` or env vars |
 | `{CLIENT_JWKS}` | Generated ES256 private JWKS (FAPI2) |
 | `{MTLS_CERT}`, `{MTLS_KEY}` | Generated self-signed cert (FAPI2 mTLS) |
@@ -113,7 +112,6 @@ Git submodule pointing to the OpenID Foundation conformance suite (Java/Spring B
 | `VOUCH_REPO_PATH` | `../vouch` | Path to vouch source for Docker build |
 | `CONFORMANCE_SERVER` | `https://localhost.emobix.co.uk:8443` | Conformance suite URL |
 | `VOUCH_URL` | `https://localhost:9443` | Vouch URL for client registration |
-| `VOUCH_BASE_URL` | `https://vouch-proxy` | Vouch URL as seen by conformance suite |
 
 ## Cleanup
 

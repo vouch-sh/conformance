@@ -384,13 +384,13 @@ def main() -> None:
     )
     parser.add_argument(
         "--base-url",
-        default="https://vouch-proxy",
+        default="https://vouch",
         help="Vouch server base URL as seen by the conformance suite",
     )
     parser.add_argument(
         "--mtls-base-url",
-        default="",
-        help="mTLS resource endpoint base URL (defaults to --base-url)",
+        default="https://vouch:8443",
+        help="mTLS resource endpoint base URL (default: https://vouch:8443)",
     )
     parser.add_argument(
         "--conformance-server",

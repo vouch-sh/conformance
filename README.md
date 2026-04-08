@@ -152,10 +152,9 @@ All services communicate on the `conformance-net` Docker network.
 | `mongodb` | Conformance suite state store | (internal) |
 | `server` | OpenID Conformance Suite (Spring Boot, devmode) | (internal) |
 | `nginx` | TLS reverse proxy for conformance suite | 8443 |
-| `vouch` | Vouch OIDC server under test | 3000 (HTTP) |
-| `vouch-proxy` | TLS + mTLS termination proxy for vouch | 9443 (TLS), 9444 (mTLS) |
+| `vouch` | Vouch OIDC server under test | 3000 (HTTP), 9443 (TLS), 9444 (mTLS) |
 
-The conformance suite reaches Vouch at `https://vouch-proxy` (Docker-internal DNS). The `vouch-proxy` nginx container provides TLS termination on port 443 (mapped to host 9443) and TCP passthrough on port 8443 (mapped to host 9444) for mTLS, where Vouch handles client certificate verification directly.
+The conformance suite reaches Vouch at `https://vouch` (Docker-internal DNS). Vouch serves TLS natively on port 443 (mapped to host 9443) and mTLS on port 8443 (mapped to host 9444).
 
 ### Python Scripts
 
@@ -181,7 +180,6 @@ JSON config files in `config/` contain placeholder tokens (`{BASEURL}`, `{CLIENT
 | `VOUCH_REPO_PATH` | `../vouch` | Path to Vouch source directory for Docker build context |
 | `CONFORMANCE_SERVER` | `https://localhost.emobix.co.uk:8443` | Base URL of the conformance suite API |
 | `VOUCH_URL` | `https://localhost:9443` | Vouch URL used by `register_client.py` for client registration |
-| `VOUCH_BASE_URL` | `https://vouch-proxy` | Vouch URL as seen by the conformance suite (Docker-internal) |
 
 Most other variables (`CLIENT_ID`, `CLIENT_SECRET`, `CLIENT_JWKS`, `MTLS_CERT`, `MTLS_KEY`) are set automatically by `register_client.py` during FAPI 2.0 test runs.
 

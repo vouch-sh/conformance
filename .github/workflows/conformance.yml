@@ -250,9 +250,7 @@ jobs:
         run: |
           python3 scripts/register_client.py \
             --plan "$PLAN" \
-            --config "$CONFIG" \
-            --vouch-url https://localhost:9443 \
-            --conformance-url https://localhost.emobix.co.uk:8443
+            --config "$CONFIG"
 
       - name: Run conformance tests
         env:
@@ -263,9 +261,6 @@ jobs:
           python3 scripts/run.py \
             --plan "$PLAN" \
             --config "$CONFIG" \
-            --base-url https://vouch-proxy \
-            --mtls-base-url https://vouch-proxy:8443 \
-            --conformance-server https://localhost.emobix.co.uk:8443 \
             --version "$VERSION"
 
       - name: Show vouch logs on failure

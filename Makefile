@@ -10,7 +10,6 @@
 
 CONFORMANCE_SERVER ?= https://localhost.emobix.co.uk:8443
 VOUCH_URL          ?= https://localhost:9443
-VOUCH_BASE_URL     ?= https://vouch-proxy
 SCRIPTS            := scripts
 CONFIG             := config
 
@@ -21,17 +20,17 @@ init:
 
 certs:
 	@mkdir -p certs
-	@test -f certs/vouch-proxy.crt || \
+	@test -f certs/vouch.crt || \
 		openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-			-keyout certs/vouch-proxy.key \
-			-out certs/vouch-proxy.crt \
-			-subj "/CN=vouch-proxy" \
-			-addext "subjectAltName=DNS:vouch-proxy,DNS:localhost" \
+			-keyout certs/vouch.key \
+			-out certs/vouch.crt \
+			-subj "/CN=vouch" \
+			-addext "subjectAltName=DNS:vouch,DNS:localhost" \
 			2>/dev/null && \
-		echo "Generated certs/vouch-proxy.crt"
+		echo "Generated certs/vouch.crt"
 	@test -f certs/vouch-tls.env || { \
-		echo "VOUCH_TLS_CERT=$$(base64 < certs/vouch-proxy.crt | tr -d '\n')" > certs/vouch-tls.env && \
-		echo "VOUCH_TLS_KEY=$$(base64 < certs/vouch-proxy.key | tr -d '\n')" >> certs/vouch-tls.env && \
+		echo "VOUCH_TLS_CERT=$$(base64 < certs/vouch.crt | tr -d '\n')" > certs/vouch-tls.env && \
+		echo "VOUCH_TLS_KEY=$$(base64 < certs/vouch.key | tr -d '\n')" >> certs/vouch-tls.env && \
 		echo "Generated certs/vouch-tls.env"; \
 	}
 
@@ -72,130 +71,90 @@ clean:
 test-oidc-basic:
 	python3 $(SCRIPTS)/run.py \
 		--plan oidcc-basic-certification-test-plan \
-		--config $(CONFIG)/oidcc-basic.json \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
+		--config $(CONFIG)/oidcc-basic.json
 
 test-oidc-config:
 	python3 $(SCRIPTS)/run.py \
 		--plan oidcc-config-certification-test-plan \
-		--config $(CONFIG)/oidcc-config.json \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
+		--config $(CONFIG)/oidcc-config.json
 
 test-oidc-dynamic:
 	python3 $(SCRIPTS)/run.py \
 		--plan oidcc-dynamic-certification-test-plan \
-		--config $(CONFIG)/oidcc-dynamic.json \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
+		--config $(CONFIG)/oidcc-dynamic.json
 
 test-oidc-formpost:
 	python3 $(SCRIPTS)/run.py \
 		--plan oidcc-formpost-basic-certification-test-plan \
-		--config $(CONFIG)/oidcc-formpost.json \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
+		--config $(CONFIG)/oidcc-formpost.json
 
 # -- FAPI 2.0 Security Profile (columns 1-5) ----------------------------------
 
 test-fapi2-sp-mtls-mtls:
 	@eval "$$(python3 $(SCRIPTS)/register_client.py \
 		--plan fapi2-security-profile-final-test-plan \
-		--config $(CONFIG)/fapi2-sp-mtls-mtls.json \
-		--vouch-url $(VOUCH_URL) \
-		--conformance-url $(CONFORMANCE_SERVER))" && \
+		--config $(CONFIG)/fapi2-sp-mtls-mtls.json)" && \
 	python3 $(SCRIPTS)/run.py \
 		--plan fapi2-security-profile-final-test-plan \
-		--config $(CONFIG)/fapi2-sp-mtls-mtls.json \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
+		--config $(CONFIG)/fapi2-sp-mtls-mtls.json
 
 test-fapi2-sp-mtls-dpop:
 	@eval "$$(python3 $(SCRIPTS)/register_client.py \
 		--plan fapi2-security-profile-final-test-plan \
-		--config $(CONFIG)/fapi2-sp-mtls-dpop.json \
-		--vouch-url $(VOUCH_URL) \
-		--conformance-url $(CONFORMANCE_SERVER))" && \
+		--config $(CONFIG)/fapi2-sp-mtls-dpop.json)" && \
 	python3 $(SCRIPTS)/run.py \
 		--plan fapi2-security-profile-final-test-plan \
-		--config $(CONFIG)/fapi2-sp-mtls-dpop.json \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
+		--config $(CONFIG)/fapi2-sp-mtls-dpop.json
 
 test-fapi2-sp-pk-mtls:
 	@eval "$$(python3 $(SCRIPTS)/register_client.py \
 		--plan fapi2-security-profile-final-test-plan \
-		--config $(CONFIG)/fapi2-sp-pk-mtls.json \
-		--vouch-url $(VOUCH_URL) \
-		--conformance-url $(CONFORMANCE_SERVER))" && \
+		--config $(CONFIG)/fapi2-sp-pk-mtls.json)" && \
 	python3 $(SCRIPTS)/run.py \
 		--plan fapi2-security-profile-final-test-plan \
-		--config $(CONFIG)/fapi2-sp-pk-mtls.json \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
+		--config $(CONFIG)/fapi2-sp-pk-mtls.json
 
 test-fapi2:
 	@eval "$$(python3 $(SCRIPTS)/register_client.py \
 		--plan fapi2-security-profile-final-test-plan \
-		--config $(CONFIG)/fapi2-security-profile.json \
-		--vouch-url $(VOUCH_URL) \
-		--conformance-url $(CONFORMANCE_SERVER))" && \
+		--config $(CONFIG)/fapi2-security-profile.json)" && \
 	python3 $(SCRIPTS)/run.py \
 		--plan fapi2-security-profile-final-test-plan \
-		--config $(CONFIG)/fapi2-security-profile.json \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
+		--config $(CONFIG)/fapi2-security-profile.json
 
 # -- FAPI 2.0 Message Signing (columns 6-7) -----------------------------------
 
 test-fapi2-ms:
 	@eval "$$(python3 $(SCRIPTS)/register_client.py \
 		--plan fapi2-message-signing-final-test-plan \
-		--config $(CONFIG)/fapi2-message-signing.json \
-		--vouch-url $(VOUCH_URL) \
-		--conformance-url $(CONFORMANCE_SERVER))" && \
+		--config $(CONFIG)/fapi2-message-signing.json)" && \
 	python3 $(SCRIPTS)/run.py \
 		--plan fapi2-message-signing-final-test-plan \
-		--config $(CONFIG)/fapi2-message-signing.json \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
+		--config $(CONFIG)/fapi2-message-signing.json
 
 test-fapi2-ms-jarm:
 	@eval "$$(python3 $(SCRIPTS)/register_client.py \
 		--plan fapi2-message-signing-final-test-plan \
-		--config $(CONFIG)/fapi2-ms-jarm.json \
-		--vouch-url $(VOUCH_URL) \
-		--conformance-url $(CONFORMANCE_SERVER))" && \
+		--config $(CONFIG)/fapi2-ms-jarm.json)" && \
 	python3 $(SCRIPTS)/run.py \
 		--plan fapi2-message-signing-final-test-plan \
-		--config $(CONFIG)/fapi2-ms-jarm.json \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
+		--config $(CONFIG)/fapi2-ms-jarm.json
 
 test-fapi2-ms-mtls:
 	@eval "$$(python3 $(SCRIPTS)/register_client.py \
 		--plan fapi2-message-signing-final-test-plan \
-		--config $(CONFIG)/fapi2-ms-mtls.json \
-		--vouch-url $(VOUCH_URL) \
-		--conformance-url $(CONFORMANCE_SERVER))" && \
+		--config $(CONFIG)/fapi2-ms-mtls.json)" && \
 	python3 $(SCRIPTS)/run.py \
 		--plan fapi2-message-signing-final-test-plan \
-		--config $(CONFIG)/fapi2-ms-mtls.json \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
+		--config $(CONFIG)/fapi2-ms-mtls.json
 
 test-fapi2-ms-mtls-jarm:
 	@eval "$$(python3 $(SCRIPTS)/register_client.py \
 		--plan fapi2-message-signing-final-test-plan \
-		--config $(CONFIG)/fapi2-ms-mtls-jarm.json \
-		--vouch-url $(VOUCH_URL) \
-		--conformance-url $(CONFORMANCE_SERVER))" && \
+		--config $(CONFIG)/fapi2-ms-mtls-jarm.json)" && \
 	python3 $(SCRIPTS)/run.py \
 		--plan fapi2-message-signing-final-test-plan \
-		--config $(CONFIG)/fapi2-ms-mtls-jarm.json \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
+		--config $(CONFIG)/fapi2-ms-mtls-jarm.json
 
 # -- FAPI 2.0 grouping targets ------------------------------------------------
 
@@ -223,9 +182,7 @@ vouch-logs:
 rerun-failures:
 	python3 $(SCRIPTS)/run.py --rerun-failures \
 		--plan $$(python3 -c "import json; print(json.load(open('.last-run.json'))['plan_name'])") \
-		--config $$(python3 -c "import json; s=json.load(open('.last-run.json')); print(s.get('config',''))") \
-		--base-url $(VOUCH_BASE_URL) \
-		--conformance-server $(CONFORMANCE_SERVER)
+		--config $$(python3 -c "import json; s=json.load(open('.last-run.json')); print(s.get('config',''))")
 
 # -- Run all -------------------------------------------------------------------
 

@@ -14,7 +14,7 @@ Usage:
     eval $(python3 register_client.py \
         --plan fapi2-security-profile-final-test-plan \
         --config config/fapi2-security-profile.json \
-        --vouch-url http://localhost:3000)
+        --vouch-url https://localhost:9443)
 """
 
 import argparse
@@ -232,8 +232,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--vouch-url",
-        default="http://localhost:3000",
-        help="Base URL of the Vouch server (default: http://localhost:3000)",
+        default="https://localhost:9443",
+        help="Base URL of the Vouch server (default: https://localhost:9443)",
     )
     parser.add_argument(
         "--conformance-url",

@@ -25,12 +25,12 @@ services:
       context: ./conformance-suite/server-dev
     volumes:
       - ./conformance-suite/target/:/server/
-      - ./certs/vouch-proxy.crt:/certs/vouch-proxy.crt:ro
+      - ./certs/vouch.crt:/certs/vouch.crt:ro
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        keytool -importcert -noprompt -alias vouch-proxy \
-          -file /certs/vouch-proxy.crt \
+        keytool -importcert -noprompt -alias vouch \
+          -file /certs/vouch.crt \
           -keystore $$JAVA_HOME/lib/security/cacerts \
           -storepass changeit 2>/dev/null || true
         exec java \
@@ -51,21 +51,21 @@ services:
         max-size: "500k"
         max-file: "5"
 
-  # Vouch OIDC server (HTTP on 3000, mTLS on 8443).
-  # TLS cert enables mtls_endpoint_aliases in discovery and the mTLS listener.
+  # Vouch OIDC server (TLS on 443, mTLS on 8443).
   # VOUCH_TLS_CERT/KEY expect base64-encoded PEM content (set via env_file).
   vouch:
     build:
       context: ${VOUCH_REPO_PATH:-../vouch}
     ports:
       - "3000:80"
+      - "9443:443"
+      - "9444:8443"
     env_file:
       - path: certs/vouch-tls.env
         required: false
     environment:
-      VOUCH_LISTEN_ADDR: "0.0.0.0:3000"
-      VOUCH_BASE_URL: "https://vouch-proxy"
-      VOUCH_RP_ID: "vouch-proxy"
+      VOUCH_BASE_URL: "https://vouch"
+      VOUCH_RP_ID: "vouch"
       VOUCH_RP_NAME: "Vouch Conformance"
       VOUCH_JWT_SECRET: "local-conformance-testing-secret-value-not-for-production"
       VOUCH_CERTIFICATION_TEST_TOKEN: "local-cert-test-token"
@@ -75,21 +75,6 @@ services:
       VOUCH_MTLS_PORT: "8443"
     volumes:
       - vouch-data:/data
-    networks:
-      - conformance-net
-
-  # TLS termination proxy for vouch (self-signed cert).
-  vouch-proxy:
-    build:
-      context: ./nginx
-    ports:
-      - "9443:443"
-      - "9444:8443"
-    volumes:
-      - ./certs/vouch-proxy.crt:/etc/ssl/certs/vouch-proxy.crt:ro
-      - ./certs/vouch-proxy.key:/etc/ssl/private/vouch-proxy.key:ro
-    depends_on:
-      - vouch
     networks:
       - conformance-net
 
