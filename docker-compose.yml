@@ -14,10 +14,15 @@ services:
       context: ./conformance-suite/nginx
     ports:
       - "8443:8443"
+    volumes:
+      - ./certs/nginx.crt:/etc/ssl/certs/nginx-selfsigned.crt:ro
+      - ./certs/nginx.key:/etc/ssl/private/nginx-selfsigned.key:ro
     depends_on:
       - server
     networks:
-      - conformance-net
+      conformance-net:
+        aliases:
+          - localhost.emobix.co.uk
 
   # Conformance suite Java test server.
   server:
@@ -73,8 +78,10 @@ services:
       VOUCH_DATABASE_URL: "sqlite:/data/vouch.db?mode=rwc"
       VOUCH_TRUSTED_PROXIES: "0.0.0.0/0"
       VOUCH_MTLS_PORT: "8443"
+      VOUCH_EXTRA_CA_CERTS: "/certs/nginx.crt"
     volumes:
       - vouch-data:/data
+      - ./certs/nginx.crt:/certs/nginx.crt:ro
     networks:
       - conformance-net
 

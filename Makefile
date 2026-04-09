@@ -33,6 +33,15 @@ certs:
 		echo "VOUCH_TLS_KEY=$$(base64 < certs/vouch.key | tr -d '\n')" >> certs/vouch-tls.env && \
 		echo "Generated certs/vouch-tls.env"; \
 	}
+	@test -f certs/nginx.crt || \
+		openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+			-keyout certs/nginx.key \
+			-out certs/nginx.crt \
+			-subj "/CN=localhost" \
+			-addext "basicConstraints=critical,CA:FALSE" \
+			-addext "subjectAltName=DNS:localhost,DNS:nginx,DNS:localhost.emobix.co.uk" \
+			2>/dev/null && \
+		echo "Generated certs/nginx.crt"
 
 build: init certs
 	cd conformance-suite && \

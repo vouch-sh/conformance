@@ -19,6 +19,7 @@
           "optional": true,
           "match": "{BASEURL}/login*",
           "commands": [
+            ["wait", "id", "cert-login", 10],
             ["click", "id", "cert-login"]
           ]
         },
@@ -44,6 +45,158 @@
               "match": "{BASEURL}/oauth/authorize*",
               "commands": [
                 ["wait", "xpath", "//*", 10, "Access Denied", "update-image-placeholder"]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "oidcc-ensure-redirect-uri-in-authorization-request": {
+      "browser": [
+        {
+          "match": "{BASEURL}/oauth/authorize*",
+          "tasks": [
+            {
+              "task": "Expect missing redirect_uri error page",
+              "match": "{BASEURL}/oauth/authorize*",
+              "commands": [
+                ["wait", "xpath", "//*", 10, "Access Denied", "update-image-placeholder"]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "oidcc-redirect-uri-query-mismatch": {
+      "browser": [
+        {
+          "match": "{BASEURL}/oauth/authorize*",
+          "tasks": [
+            {
+              "task": "Expect redirect uri mismatch error page",
+              "match": "{BASEURL}/oauth/authorize*",
+              "commands": [
+                ["wait", "xpath", "//*", 10, "Access Denied", "update-image-placeholder"]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "oidcc-redirect-uri-query-added": {
+      "browser": [
+        {
+          "match": "{BASEURL}/oauth/authorize*",
+          "tasks": [
+            {
+              "task": "Expect redirect uri error page",
+              "match": "{BASEURL}/oauth/authorize*",
+              "commands": [
+                ["wait", "xpath", "//*", 10, "Access Denied", "update-image-placeholder"]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "oidcc-request-uri-signed-rs256": {
+      "browser": [
+        {
+          "match": "{BASEURL}/oauth/authorize*",
+          "tasks": [
+            {
+              "task": "Login",
+              "optional": true,
+              "match": "{BASEURL}/login*",
+              "commands": [
+                ["wait", "id", "cert-login", 10],
+                ["click", "id", "cert-login"]
+              ]
+            },
+            {
+              "task": "Verify Complete",
+              "optional": true,
+              "match": "*/test/*/callback*",
+              "commands": [
+                ["wait", "id", "submission_complete", 10]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "oidcc-registration-logo-uri": {
+      "browser": [
+        {
+          "match": "{BASEURL}/oauth/authorize*",
+          "tasks": [
+            {
+              "task": "Login",
+              "optional": true,
+              "match": "{BASEURL}/login*",
+              "commands": [
+                ["wait", "xpath", "//*", 10, "Sign In", "update-image-placeholder-optional"],
+                ["click", "id", "cert-login"]
+              ]
+            },
+            {
+              "task": "Verify Complete",
+              "optional": true,
+              "match": "*/test/*/callback*",
+              "commands": [
+                ["wait", "id", "submission_complete", 10]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "oidcc-registration-policy-uri": {
+      "browser": [
+        {
+          "match": "{BASEURL}/oauth/authorize*",
+          "tasks": [
+            {
+              "task": "Login",
+              "optional": true,
+              "match": "{BASEURL}/login*",
+              "commands": [
+                ["wait", "xpath", "//*", 10, "Sign In", "update-image-placeholder-optional"],
+                ["click", "id", "cert-login"]
+              ]
+            },
+            {
+              "task": "Verify Complete",
+              "optional": true,
+              "match": "*/test/*/callback*",
+              "commands": [
+                ["wait", "id", "submission_complete", 10]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "oidcc-registration-tos-uri": {
+      "browser": [
+        {
+          "match": "{BASEURL}/oauth/authorize*",
+          "tasks": [
+            {
+              "task": "Login",
+              "optional": true,
+              "match": "{BASEURL}/login*",
+              "commands": [
+                ["wait", "xpath", "//*", 10, "Sign In", "update-image-placeholder-optional"],
+                ["click", "id", "cert-login"]
+              ]
+            },
+            {
+              "task": "Verify Complete",
+              "optional": true,
+              "match": "*/test/*/callback*",
+              "commands": [
+                ["wait", "id", "submission_complete", 10]
               ]
             }
           ]
