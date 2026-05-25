@@ -15,6 +15,7 @@ data/
 # Python
 __pycache__/
 *.pyc
+.venv/
 
 # Editor
 .idea/
@@ -23,3 +24,4 @@ __pycache__/
 /.local
 /.claude/worktrees
 .baseline-run.json
+results/

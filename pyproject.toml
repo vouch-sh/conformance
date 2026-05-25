@@ -1,0 +1,8 @@
+[project]
+name = "vouch-conformance"
+version = "0.1.0"
+description = "Local OpenID conformance suite harness for the Vouch OIDC server"
+requires-python = ">=3.14"
+dependencies = [
+    "cryptography==48.0.0",
+]

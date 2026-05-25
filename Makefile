@@ -12,6 +12,10 @@ CONFORMANCE_SERVER ?= https://localhost.emobix.co.uk:8443
 VOUCH_URL          ?= https://localhost:9443
 SCRIPTS            := scripts
 CONFIG             := config
+PYTHON             := .venv/bin/python
+
+$(PYTHON):
+	uv sync
 
 # -- Setup --------------------------------------------------------------------
 
@@ -78,90 +82,90 @@ clean:
 # -- OIDC test plans ----------------------------------------------------------
 
 test-oidc-basic:
-	python3 $(SCRIPTS)/run.py \
+	$(PYTHON) $(SCRIPTS)/run.py \
 		--plan oidcc-basic-certification-test-plan \
 		--config $(CONFIG)/oidcc-basic.json
 
 test-oidc-config:
-	python3 $(SCRIPTS)/run.py \
+	$(PYTHON) $(SCRIPTS)/run.py \
 		--plan oidcc-config-certification-test-plan \
 		--config $(CONFIG)/oidcc-config.json
 
 test-oidc-dynamic:
-	python3 $(SCRIPTS)/run.py \
+	$(PYTHON) $(SCRIPTS)/run.py \
 		--plan oidcc-dynamic-certification-test-plan \
 		--config $(CONFIG)/oidcc-dynamic.json
 
 test-oidc-formpost:
-	python3 $(SCRIPTS)/run.py \
+	$(PYTHON) $(SCRIPTS)/run.py \
 		--plan oidcc-formpost-basic-certification-test-plan \
 		--config $(CONFIG)/oidcc-formpost.json
 
 # -- FAPI 2.0 Security Profile (columns 1-5) ----------------------------------
 
 test-fapi2-sp-mtls-mtls:
-	@eval "$$(python3 $(SCRIPTS)/register_client.py \
+	@eval "$$($(PYTHON) $(SCRIPTS)/register_client.py \
 		--plan fapi2-security-profile-final-test-plan \
 		--config $(CONFIG)/fapi2-sp-mtls-mtls.json)" && \
-	python3 $(SCRIPTS)/run.py \
+	$(PYTHON) $(SCRIPTS)/run.py \
 		--plan fapi2-security-profile-final-test-plan \
 		--config $(CONFIG)/fapi2-sp-mtls-mtls.json
 
 test-fapi2-sp-mtls-dpop:
-	@eval "$$(python3 $(SCRIPTS)/register_client.py \
+	@eval "$$($(PYTHON) $(SCRIPTS)/register_client.py \
 		--plan fapi2-security-profile-final-test-plan \
 		--config $(CONFIG)/fapi2-sp-mtls-dpop.json)" && \
-	python3 $(SCRIPTS)/run.py \
+	$(PYTHON) $(SCRIPTS)/run.py \
 		--plan fapi2-security-profile-final-test-plan \
 		--config $(CONFIG)/fapi2-sp-mtls-dpop.json
 
 test-fapi2-sp-pk-mtls:
-	@eval "$$(python3 $(SCRIPTS)/register_client.py \
+	@eval "$$($(PYTHON) $(SCRIPTS)/register_client.py \
 		--plan fapi2-security-profile-final-test-plan \
 		--config $(CONFIG)/fapi2-sp-pk-mtls.json)" && \
-	python3 $(SCRIPTS)/run.py \
+	$(PYTHON) $(SCRIPTS)/run.py \
 		--plan fapi2-security-profile-final-test-plan \
 		--config $(CONFIG)/fapi2-sp-pk-mtls.json
 
 test-fapi2:
-	@eval "$$(python3 $(SCRIPTS)/register_client.py \
+	@eval "$$($(PYTHON) $(SCRIPTS)/register_client.py \
 		--plan fapi2-security-profile-final-test-plan \
 		--config $(CONFIG)/fapi2-security-profile.json)" && \
-	python3 $(SCRIPTS)/run.py \
+	$(PYTHON) $(SCRIPTS)/run.py \
 		--plan fapi2-security-profile-final-test-plan \
 		--config $(CONFIG)/fapi2-security-profile.json
 
 # -- FAPI 2.0 Message Signing (columns 6-7) -----------------------------------
 
 test-fapi2-ms:
-	@eval "$$(python3 $(SCRIPTS)/register_client.py \
+	@eval "$$($(PYTHON) $(SCRIPTS)/register_client.py \
 		--plan fapi2-message-signing-final-test-plan \
 		--config $(CONFIG)/fapi2-message-signing.json)" && \
-	python3 $(SCRIPTS)/run.py \
+	$(PYTHON) $(SCRIPTS)/run.py \
 		--plan fapi2-message-signing-final-test-plan \
 		--config $(CONFIG)/fapi2-message-signing.json
 
 test-fapi2-ms-jarm:
-	@eval "$$(python3 $(SCRIPTS)/register_client.py \
+	@eval "$$($(PYTHON) $(SCRIPTS)/register_client.py \
 		--plan fapi2-message-signing-final-test-plan \
 		--config $(CONFIG)/fapi2-ms-jarm.json)" && \
-	python3 $(SCRIPTS)/run.py \
+	$(PYTHON) $(SCRIPTS)/run.py \
 		--plan fapi2-message-signing-final-test-plan \
 		--config $(CONFIG)/fapi2-ms-jarm.json
 
 test-fapi2-ms-mtls:
-	@eval "$$(python3 $(SCRIPTS)/register_client.py \
+	@eval "$$($(PYTHON) $(SCRIPTS)/register_client.py \
 		--plan fapi2-message-signing-final-test-plan \
 		--config $(CONFIG)/fapi2-ms-mtls.json)" && \
-	python3 $(SCRIPTS)/run.py \
+	$(PYTHON) $(SCRIPTS)/run.py \
 		--plan fapi2-message-signing-final-test-plan \
 		--config $(CONFIG)/fapi2-ms-mtls.json
 
 test-fapi2-ms-mtls-jarm:
-	@eval "$$(python3 $(SCRIPTS)/register_client.py \
+	@eval "$$($(PYTHON) $(SCRIPTS)/register_client.py \
 		--plan fapi2-message-signing-final-test-plan \
 		--config $(CONFIG)/fapi2-ms-mtls-jarm.json)" && \
-	python3 $(SCRIPTS)/run.py \
+	$(PYTHON) $(SCRIPTS)/run.py \
 		--plan fapi2-message-signing-final-test-plan \
 		--config $(CONFIG)/fapi2-ms-mtls-jarm.json
 
@@ -189,7 +193,7 @@ vouch-logs:
 	docker compose logs -f vouch
 
 rerun-failures:
-	python3 $(SCRIPTS)/run.py --rerun-failures \
+	$(PYTHON) $(SCRIPTS)/run.py --rerun-failures \
 		--plan $$(python3 -c "import json; print(json.load(open('.last-run.json'))['plan_name'])") \
 		--config $$(python3 -c "import json; s=json.load(open('.last-run.json')); print(s.get('config',''))")
 
