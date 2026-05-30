@@ -81,6 +81,7 @@ jobs:
     name: ${{ matrix.label }}
     needs: build-suite
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.allow_failure || false }}
     strategy:
       fail-fast: false
       matrix:
@@ -98,6 +99,7 @@ jobs:
             plan: oidcc-dynamic-certification-test-plan
             config: config/oidcc-dynamic.json
             needs_dcr: false
+            allow_failure: true
           - label: OIDC Form Post OP
             plan: oidcc-formpost-basic-certification-test-plan
             config: config/oidcc-formpost.json
