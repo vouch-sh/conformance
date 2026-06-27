@@ -4,7 +4,8 @@ name: Conformance Tests
 # using the local Docker Compose setup with proper TLS and mTLS.
 #
 # Triggered by:
-#   - Push to main (builds vouch from source)
+#   - Push to main (pulls latest released GHCR image, except jobs that set a
+#     matrix vouch_ref, which build that vouch ref from source)
 #   - Release dispatch from vouch repo (pulls pre-built GHCR image)
 #   - Manual dispatch (either mode)
 
@@ -108,6 +109,10 @@ jobs:
             plan: oidcc-rp-initiated-logout-certification-test-plan
             config: config/oidcc-rp-logout.json
             needs_dcr: false
+            # The end_session confirmation page with the cert-logout button
+            # exists on vouch main but is not yet in a tagged release, so build
+            # vouch from source for this job. Drop once a release includes it.
+            vouch_ref: main
           # FAPI 2.0 Security Profile
           - label: FAPI2SP PK+DPoP
             plan: fapi2-security-profile-final-test-plan
@@ -163,15 +168,20 @@ jobs:
           INPUT_IMAGE: ${{ github.event.inputs.image || '' }}
           DISPATCH_IMAGE: ${{ github.event.client_payload.image || '' }}
           VOUCH_REF: ${{ github.event.inputs.vouch_ref || '' }}
+          MATRIX_VOUCH_REF: ${{ matrix.vouch_ref || '' }}
         run: |
           IMAGE="${INPUT_IMAGE:-$DISPATCH_IMAGE}"
+          # A run-level vouch_ref input wins over the per-job matrix ref; an
+          # explicit image (input/dispatch) overrides both and forces pull mode.
+          REF="${VOUCH_REF:-$MATRIX_VOUCH_REF}"
           if [ -n "$IMAGE" ]; then
             echo "mode=pull" >> "$GITHUB_OUTPUT"
             echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
             VERSION="${IMAGE##*:}"
-          elif [ -n "$VOUCH_REF" ]; then
+          elif [ -n "$REF" ]; then
             echo "mode=build" >> "$GITHUB_OUTPUT"
-            VERSION="${VOUCH_REF}"
+            echo "ref=${REF}" >> "$GITHUB_OUTPUT"
+            VERSION="${REF}"
           else
             echo "mode=pull" >> "$GITHUB_OUTPUT"
             echo "image=ghcr.io/vouch-sh/vouch:latest" >> "$GITHUB_OUTPUT"
@@ -202,7 +212,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: vouch-sh/vouch
-          ref: ${{ github.event.inputs.vouch_ref || 'main' }}
+          ref: ${{ steps.source.outputs.ref || 'main' }}
           path: vouch-src
           persist-credentials: false
 
