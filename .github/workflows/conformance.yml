@@ -3,11 +3,14 @@ name: Conformance Tests
 # Runs the full OpenID conformance suite (OIDC + FAPI2) against Vouch
 # using the local Docker Compose setup with proper TLS and mTLS.
 #
+# Vouch is built once (see the build-vouch job) and the resulting image is
+# shared with every test job, so the matrix runs against a single vouch build.
+#
 # Triggered by:
-#   - Push to main (pulls latest released GHCR image, except jobs that set a
-#     matrix vouch_ref, which build that vouch ref from source)
-#   - Release dispatch from vouch repo (pulls pre-built GHCR image)
-#   - Manual dispatch (either mode)
+#   - Push to main: builds vouch from main, to catch conformance regressions
+#     before a release is tagged.
+#   - Release dispatch from vouch repo: tests the released GHCR image.
+#   - Manual dispatch: optionally test a specific image or build a specific ref.
 
 on:
   push:
@@ -17,11 +20,11 @@ on:
   workflow_dispatch:
     inputs:
       image:
-        description: 'GHCR image to test (e.g., ghcr.io/vouch-sh/vouch:2026.4.2). Defaults to latest release.'
+        description: 'GHCR image to test (e.g., ghcr.io/vouch-sh/vouch:2026.4.2). Overrides vouch_ref.'
         required: false
         type: string
       vouch_ref:
-        description: 'Vouch repo ref to build from (e.g., main). Leave empty to use latest release image.'
+        description: 'Vouch repo ref to build from. Defaults to main.'
         required: false
         type: string
 
@@ -78,9 +81,78 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  build-vouch:
+    name: Build Vouch Image
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.source.outputs.version }}
+    steps:
+      # Decide once, for the whole run, which vouch build the matrix tests against.
+      - name: Determine vouch image source
+        id: source
+        env:
+          INPUT_IMAGE: ${{ github.event.inputs.image || '' }}
+          DISPATCH_IMAGE: ${{ github.event.client_payload.image || '' }}
+          VOUCH_REF: ${{ github.event.inputs.vouch_ref || '' }}
+        run: |
+          IMAGE="${INPUT_IMAGE:-$DISPATCH_IMAGE}"
+          # An explicit image (manual input or release dispatch) is tested as-is.
+          # Otherwise build from source: the requested ref, or main by default so
+          # pushes catch regressions before a release is tagged.
+          if [ -n "$IMAGE" ]; then
+            echo "mode=pull" >> "$GITHUB_OUTPUT"
+            echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+            echo "version=${IMAGE##*:}" >> "$GITHUB_OUTPUT"
+          else
+            REF="${VOUCH_REF:-main}"
+            echo "mode=build" >> "$GITHUB_OUTPUT"
+            echo "ref=${REF}" >> "$GITHUB_OUTPUT"
+            echo "version=${REF}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Log in to GHCR
+        if: steps.source.outputs.mode == 'pull'
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull pre-built vouch image
+        if: steps.source.outputs.mode == 'pull'
+        env:
+          IMAGE: ${{ steps.source.outputs.image }}
+        run: |
+          docker pull "$IMAGE"
+          docker tag "$IMAGE" conformance-vouch:ci
+
+      - name: Checkout vouch source
+        if: steps.source.outputs.mode == 'build'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: vouch-sh/vouch
+          ref: ${{ steps.source.outputs.ref }}
+          path: vouch-src
+          persist-credentials: false
+
+      - name: Build vouch image from source
+        if: steps.source.outputs.mode == 'build'
+        run: docker build -t conformance-vouch:ci ./vouch-src
+
+      - name: Export vouch image
+        run: docker save conformance-vouch:ci | gzip > vouch-image.tar.gz
+
+      - name: Upload vouch image
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: vouch-image
+          path: vouch-image.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
   test:
     name: ${{ matrix.label }}
-    needs: build-suite
+    needs: [build-suite, build-vouch]
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.allow_failure || false }}
     strategy:
@@ -109,10 +181,6 @@ jobs:
             plan: oidcc-rp-initiated-logout-certification-test-plan
             config: config/oidcc-rp-logout.json
             needs_dcr: false
-            # The end_session confirmation page with the cert-logout button
-            # exists on vouch main but is not yet in a tagged release, so build
-            # vouch from source for this job. Drop once a release includes it.
-            vouch_ref: main
           # FAPI 2.0 Security Profile
           - label: FAPI2SP PK+DPoP
             plan: fapi2-security-profile-final-test-plan
@@ -161,67 +229,25 @@ jobs:
           name: conformance-suite-jar
           path: conformance-suite/target
 
-      # Determine whether to pull a pre-built image or build from source.
-      - name: Determine vouch image source
-        id: source
-        env:
-          INPUT_IMAGE: ${{ github.event.inputs.image || '' }}
-          DISPATCH_IMAGE: ${{ github.event.client_payload.image || '' }}
-          VOUCH_REF: ${{ github.event.inputs.vouch_ref || '' }}
-          MATRIX_VOUCH_REF: ${{ matrix.vouch_ref || '' }}
-        run: |
-          IMAGE="${INPUT_IMAGE:-$DISPATCH_IMAGE}"
-          # A run-level vouch_ref input wins over the per-job matrix ref; an
-          # explicit image (input/dispatch) overrides both and forces pull mode.
-          REF="${VOUCH_REF:-$MATRIX_VOUCH_REF}"
-          if [ -n "$IMAGE" ]; then
-            echo "mode=pull" >> "$GITHUB_OUTPUT"
-            echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
-            VERSION="${IMAGE##*:}"
-          elif [ -n "$REF" ]; then
-            echo "mode=build" >> "$GITHUB_OUTPUT"
-            echo "ref=${REF}" >> "$GITHUB_OUTPUT"
-            VERSION="${REF}"
-          else
-            echo "mode=pull" >> "$GITHUB_OUTPUT"
-            echo "image=ghcr.io/vouch-sh/vouch:latest" >> "$GITHUB_OUTPUT"
-            VERSION="latest"
-          fi
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-
-      # Pull mode: create a thin Dockerfile wrapper around the pre-built image.
-      - name: Log in to GHCR
-        if: steps.source.outputs.mode == 'pull'
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+      - name: Download vouch image
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          name: vouch-image
 
-      - name: Prepare pre-built image context
-        if: steps.source.outputs.mode == 'pull'
-        env:
-          IMAGE: ${{ steps.source.outputs.image }}
+      # docker compose builds vouch from VOUCH_REPO_PATH; point it at a thin
+      # context whose Dockerfile just wraps the shared, pre-built image.
+      - name: Load vouch image
         run: |
-          mkdir -p vouch-image
-          echo "FROM ${IMAGE}" > vouch-image/Dockerfile
-
-      # Build mode: checkout vouch source.
-      - name: Checkout vouch source
-        if: steps.source.outputs.mode == 'build'
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: vouch-sh/vouch
-          ref: ${{ steps.source.outputs.ref || 'main' }}
-          path: vouch-src
-          persist-credentials: false
+          docker load -i vouch-image.tar.gz
+          mkdir -p vouch-ctx
+          echo "FROM conformance-vouch:ci" > vouch-ctx/Dockerfile
 
       - name: Generate certificates
         run: make certs
 
       - name: Start services
         env:
-          VOUCH_REPO_PATH: ${{ steps.source.outputs.mode == 'pull' && './vouch-image' || './vouch-src' }}
+          VOUCH_REPO_PATH: ./vouch-ctx
         run: docker compose up -d --build
 
       - name: Wait for services
@@ -272,7 +298,7 @@ jobs:
         env:
           PLAN: ${{ matrix.plan }}
           CONFIG: ${{ matrix.config }}
-          VERSION: ${{ steps.source.outputs.version }}
+          VERSION: ${{ needs.build-vouch.outputs.version }}
         run: |
           python3 scripts/run.py \
             --plan "$PLAN" \
