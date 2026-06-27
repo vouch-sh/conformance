@@ -1,6 +1,7 @@
 .PHONY: init build certs up down logs wait clean \
 	restart-vouch vouch-logs \
 	test-oidc-basic test-oidc-config test-oidc-dynamic test-oidc-formpost \
+	test-oidc-rp-logout \
 	test-fapi2 test-fapi2-sp-mtls-mtls test-fapi2-sp-mtls-dpop \
 	test-fapi2-sp-pk-mtls \
 	test-fapi2-ms test-fapi2-ms-jarm \
@@ -101,6 +102,11 @@ test-oidc-formpost:
 		--plan oidcc-formpost-basic-certification-test-plan \
 		--config $(CONFIG)/oidcc-formpost.json
 
+test-oidc-rp-logout:
+	$(PYTHON) $(SCRIPTS)/run.py \
+		--plan oidcc-rp-initiated-logout-certification-test-plan \
+		--config $(CONFIG)/oidcc-rp-logout.json
+
 # -- FAPI 2.0 Security Profile (columns 1-5) ----------------------------------
 
 test-fapi2-sp-mtls-mtls:
@@ -199,4 +205,4 @@ rerun-failures:
 
 # -- Run all -------------------------------------------------------------------
 
-test-all: test-oidc-basic test-oidc-config test-oidc-dynamic test-oidc-formpost test-fapi2-all
+test-all: test-oidc-basic test-oidc-config test-oidc-dynamic test-oidc-formpost test-oidc-rp-logout test-fapi2-all

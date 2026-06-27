@@ -10,7 +10,7 @@ This repository automates OpenID certification testing for Vouch. It runs the co
 
 Test coverage:
 
-- **OIDC Connect** -- 4 certification plans (Basic OP, Config OP, Dynamic OP, Form Post OP)
+- **OIDC Connect** -- 5 certification plans (Basic OP, Config OP, Dynamic OP, Form Post OP, RP-Initiated Logout OP)
 - **FAPI 2.0 Security Profile** -- 4 variant combinations across `client_auth_type` (private_key_jwt, tls_client_auth) and `sender_constrain` (DPoP, mTLS)
 - **FAPI 2.0 Message Signing** -- 4 variant combinations across client auth, sender constraint, and JARM response mode
 
@@ -76,6 +76,7 @@ make test-oidc-basic      # Basic OP certification plan
 make test-oidc-config     # Config OP certification plan
 make test-oidc-dynamic    # Dynamic OP (discovery, dynamic registration, key rotation)
 make test-oidc-formpost   # Form Post OP (response_mode=form_post)
+make test-oidc-rp-logout  # RP-Initiated Logout OP (end_session_endpoint)
 ```
 
 ### FAPI 2.0 Security Profile
@@ -169,7 +170,7 @@ The conformance suite reaches Vouch at `https://vouch` (Docker-internal DNS). Vo
 
 JSON config files in `config/` contain placeholder tokens (`{BASEURL}`, `{CLIENT_ID}`, `{CLIENT_JWKS}`, etc.) substituted at runtime by `run.py`. Each config defines a `variant` (test parameterization), a `browser` array (automated login/consent interactions), and optional `override` entries for module-specific browser behavior.
 
-- **OIDC:** `oidcc-basic.json`, `oidcc-config.json`, `oidcc-dynamic.json`, `oidcc-formpost.json`
+- **OIDC:** `oidcc-basic.json`, `oidcc-config.json`, `oidcc-dynamic.json`, `oidcc-formpost.json`, `oidcc-rp-logout.json`
 - **FAPI 2.0 Security Profile:** `fapi2-security-profile.json`, `fapi2-sp-mtls-mtls.json`, `fapi2-sp-mtls-dpop.json`, `fapi2-sp-pk-mtls.json`
 - **FAPI 2.0 Message Signing:** `fapi2-message-signing.json`, `fapi2-ms-jarm.json`, `fapi2-ms-mtls.json`, `fapi2-ms-mtls-jarm.json`
 
@@ -187,7 +188,7 @@ Most other variables (`CLIENT_ID`, `CLIENT_SECRET`, `CLIENT_JWKS`, `MTLS_CERT`, 
 
 ### Conformance Tests
 
-The [`conformance.yml`](.github/workflows/conformance.yml) workflow runs on every push to `main`, on `repository_dispatch` from the Vouch repo (release events), and on manual dispatch. It builds the conformance suite JAR (cached by submodule commit SHA), then runs all 12 test plans in parallel using a matrix strategy. Two modes: build Vouch from source (`vouch_ref` input) or pull a pre-built GHCR image (`image` input).
+The [`conformance.yml`](.github/workflows/conformance.yml) workflow runs on every push to `main`, on `repository_dispatch` from the Vouch repo (release events), and on manual dispatch. It builds the conformance suite JAR (cached by submodule commit SHA), then runs all 13 test plans in parallel using a matrix strategy. Two modes: build Vouch from source (`vouch_ref` input) or pull a pre-built GHCR image (`image` input).
 
 ### Certification
 
