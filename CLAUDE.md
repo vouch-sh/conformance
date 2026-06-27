@@ -28,6 +28,7 @@ make test-oidc-basic
 make test-oidc-config
 make test-oidc-dynamic
 make test-oidc-formpost
+make test-oidc-rp-logout         # RP-Initiated Logout (end_session_endpoint)
 
 # FAPI 2.0 Security Profile (registers client, then runs)
 make test-fapi2                 # private_key_jwt + DPoP (default)

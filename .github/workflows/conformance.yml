@@ -104,6 +104,10 @@ jobs:
             plan: oidcc-formpost-basic-certification-test-plan
             config: config/oidcc-formpost.json
             needs_dcr: false
+          - label: OIDC RP-Initiated Logout
+            plan: oidcc-rp-initiated-logout-certification-test-plan
+            config: config/oidcc-rp-logout.json
+            needs_dcr: false
           # FAPI 2.0 Security Profile
           - label: FAPI2SP PK+DPoP
             plan: fapi2-security-profile-final-test-plan

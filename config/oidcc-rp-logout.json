@@ -1,0 +1,126 @@
+{
+  "description": "vouch-server/{VERSION} (https://github.com/vouch-sh/vouch)",
+  "variant": {
+    "server_metadata": "discovery",
+    "client_registration": "dynamic_client"
+  },
+  "server": {
+    "discoveryUrl": "{BASEURL}/.well-known/openid-configuration"
+  },
+  "client": {
+    "client_name": "vouch-oidcc-rp-logout",
+    "scope": "openid email"
+  },
+  "browser": [
+    {
+      "match": "{BASEURL}/oauth/authorize*",
+      "tasks": [
+        {
+          "task": "Login",
+          "optional": true,
+          "match": "{BASEURL}/login*",
+          "commands": [
+            ["click", "id", "cert-login"]
+          ]
+        },
+        {
+          "task": "Verify Complete",
+          "optional": true,
+          "match": "*/test/*/callback*",
+          "commands": [
+            ["wait", "id", "submission_complete", 10]
+          ]
+        }
+      ]
+    },
+    {
+      "match": "{BASEURL}/oauth/logout*",
+      "tasks": [
+        {
+          "task": "Confirm Logout",
+          "optional": true,
+          "match": "{BASEURL}/oauth/logout*",
+          "commands": [
+            ["click", "id", "cert-logout"]
+          ]
+        }
+      ]
+    }
+  ],
+  "override": {
+    "oidcc-rp-initiated-logout-bad-logout-redirect-uri": {
+      "browser": [
+        {
+          "match": "{BASEURL}/oauth/authorize*",
+          "tasks": [
+            {
+              "task": "Login",
+              "optional": true,
+              "match": "{BASEURL}/login*",
+              "commands": [
+                ["click", "id", "cert-login"]
+              ]
+            },
+            {
+              "task": "Verify Complete",
+              "optional": true,
+              "match": "*/test/*/callback*",
+              "commands": [
+                ["wait", "id", "submission_complete", 10]
+              ]
+            }
+          ]
+        },
+        {
+          "match": "{BASEURL}/oauth/logout*",
+          "tasks": [
+            {
+              "task": "Expect post-logout redirect uri error page",
+              "match": "{BASEURL}/oauth/logout*",
+              "commands": [
+                ["wait", "xpath", "//*", 10, "Access Denied", "update-image-placeholder"]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "oidcc-rp-initiated-logout-bad-id-token-hint": {
+      "browser": [
+        {
+          "match": "{BASEURL}/oauth/authorize*",
+          "tasks": [
+            {
+              "task": "Login",
+              "optional": true,
+              "match": "{BASEURL}/login*",
+              "commands": [
+                ["click", "id", "cert-login"]
+              ]
+            },
+            {
+              "task": "Verify Complete",
+              "optional": true,
+              "match": "*/test/*/callback*",
+              "commands": [
+                ["wait", "id", "submission_complete", 10]
+              ]
+            }
+          ]
+        },
+        {
+          "match": "{BASEURL}/oauth/logout*",
+          "tasks": [
+            {
+              "task": "Expect id_token_hint error page",
+              "match": "{BASEURL}/oauth/logout*",
+              "commands": [
+                ["wait", "xpath", "//*", 10, "Access Denied", "update-image-placeholder"]
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
