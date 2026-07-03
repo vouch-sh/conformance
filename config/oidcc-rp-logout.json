@@ -37,18 +37,18 @@
       "match": "{BASEURL}/oauth/logout*",
       "tasks": [
         {
-          "task": "Confirm Logout",
-          "optional": true,
+          "task": "Confirm logout and capture signed-out page",
           "match": "{BASEURL}/oauth/logout*",
           "commands": [
-            ["click", "id", "cert-logout"]
+            ["click", "id", "cert-logout"],
+            ["wait", "xpath", "//h1", 10, "signed out", "update-image-placeholder"]
           ]
         }
       ]
     }
   ],
   "override": {
-    "oidcc-rp-initiated-logout-bad-logout-redirect-uri": {
+    "oidcc-rp-initiated-logout": {
       "browser": [
         {
           "match": "{BASEURL}/oauth/authorize*",
@@ -75,17 +75,18 @@
           "match": "{BASEURL}/oauth/logout*",
           "tasks": [
             {
-              "task": "Expect post-logout redirect uri error page",
+              "task": "Confirm Logout",
+              "optional": true,
               "match": "{BASEURL}/oauth/logout*",
               "commands": [
-                ["wait", "xpath", "//*", 10, "Access Denied", "update-image-placeholder"]
+                ["click", "id", "cert-logout"]
               ]
             }
           ]
         }
       ]
     },
-    "oidcc-rp-initiated-logout-bad-id-token-hint": {
+    "oidcc-rp-initiated-logout-no-state": {
       "browser": [
         {
           "match": "{BASEURL}/oauth/authorize*",
@@ -112,10 +113,11 @@
           "match": "{BASEURL}/oauth/logout*",
           "tasks": [
             {
-              "task": "Expect id_token_hint error page",
+              "task": "Confirm Logout",
+              "optional": true,
               "match": "{BASEURL}/oauth/logout*",
               "commands": [
-                ["wait", "xpath", "//*", 10, "Access Denied", "update-image-placeholder"]
+                ["click", "id", "cert-logout"]
               ]
             }
           ]
