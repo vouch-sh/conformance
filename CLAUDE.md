@@ -12,7 +12,7 @@ The Vouch server source lives outside this repo (default `../vouch`, override wi
 
 ```bash
 make init          # Initialize git submodules (conformance-suite)
-make certs         # Generate self-signed TLS certs in certs/
+make certs         # Generate self-signed TLS certs and the tls_client_auth client CA in certs/
 make build         # Build conformance suite JAR via Maven in Docker
 make up            # Start all 4 Docker services
 make wait          # Block until conformance suite + vouch are healthy
@@ -84,7 +84,7 @@ All services communicate on the `conformance-net` Docker network. The conformanc
 ### Python Scripts (scripts/)
 
 - **run.py** — Main test runner. Creates plans via conformance API, starts modules, polls for completion, auto-dumps failure logs. Saves state to `.last-run.json`.
-- **register_client.py** — Dynamic Client Registration against Vouch. Generates ES256 key pairs (FAPI2 private_key_jwt) and self-signed certs (FAPI2 mTLS). Outputs shell `export` statements consumed via `eval`.
+- **register_client.py** — Dynamic Client Registration against Vouch. Generates ES256 key pairs (FAPI2 private_key_jwt) and client certs issued by the test client CA (FAPI2 mTLS). Outputs shell `export` statements consumed via `eval`.
 - **conformance.py** — HTTP client for conformance suite REST API (`/api/plan`, `/api/runner`, `/api/info`, `/api/log`). Handles SSL for self-signed certs.
 - **debug.py** — Debug helper reading `.last-run.json`. Subcommands: `failures`, `log`, `status`, `vouch-logs`.
 
@@ -97,7 +97,7 @@ JSON files with placeholder tokens substituted at runtime by `run.py`:
 | `{BASEURL}` | `--base-url` arg (default `https://vouch`) |
 | `{CLIENT_ID}`, `{CLIENT_SECRET}` | From `register_client.py` or env vars |
 | `{CLIENT_JWKS}` | Generated ES256 private JWKS (FAPI2) |
-| `{MTLS_CERT}`, `{MTLS_KEY}` | Generated self-signed cert (FAPI2 mTLS) |
+| `{MTLS_CERT}`, `{MTLS_KEY}` | Client cert issued by `certs/client-ca.crt` (FAPI2 mTLS) |
 | `{VERSION}` | `--version` arg |
 
 Each config has a `variant` object (test parameterization), `browser` array (Selenium-style automation for login/consent), and optional `override` map for per-module browser behavior.

@@ -5,7 +5,7 @@
 Reads client_alias and variant from the plan config JSON, then:
   - client_secret_basic  (OIDC plans)
   - private_key_jwt      (FAPI 2.0 plans — generates an ES256 key pair)
-  - tls_client_auth      (FAPI 2.0 MTLS plans — generates self-signed cert)
+  - tls_client_auth      (FAPI 2.0 MTLS plans — issues a cert from the test CA)
 
 Outputs shell-evaluable exports for CLIENT_ID, CLIENT_SECRET, CLIENT_JWKS,
 and optionally MTLS_CERT, MTLS_KEY, TLS_CLIENT_AUTH_SUBJECT_DN for MTLS.
@@ -19,7 +19,6 @@ Usage:
 
 import argparse
 import base64
-import datetime
 import json
 import os
 import re
@@ -28,8 +27,10 @@ import sys
 import urllib.request
 from pathlib import Path
 
+from client_ca import ensure_client_ca, issue_client_cert
 
 CONFORMANCE_BASE_URL = "https://localhost.emobix.co.uk:8443"
+CERTS_DIR = Path(__file__).resolve().parent.parent / "certs"
 
 
 def parse_variant(raw: str) -> dict[str, str]:
@@ -47,45 +48,6 @@ def parse_variant(raw: str) -> dict[str, str]:
         return json.loads(match.group(1))
     except json.JSONDecodeError:
         return {}
-
-
-def generate_self_signed_cert(cn: str) -> tuple[str, str, str]:
-    """Generate a self-signed X.509 cert for mTLS.
-
-    Returns (cert_pem, key_pem, subject_dn).
-    """
-    from cryptography import x509
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import ec
-    from cryptography.x509.oid import NameOID
-
-    key = ec.generate_private_key(ec.SECP256R1())
-    subject = issuer = x509.Name([
-        x509.NameAttribute(NameOID.COMMON_NAME, cn),
-    ])
-    cert = (
-        x509.CertificateBuilder()
-        .subject_name(subject)
-        .issuer_name(issuer)
-        .public_key(key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.datetime.now(datetime.UTC))
-        .not_valid_after(
-            datetime.datetime.now(datetime.UTC)
-            + datetime.timedelta(days=365)
-        )
-        .sign(key, hashes.SHA256())
-    )
-    cert_pem = cert.public_bytes(
-        serialization.Encoding.PEM
-    ).decode()
-    key_pem = key.private_bytes(
-        serialization.Encoding.PEM,
-        serialization.PrivateFormat.PKCS8,
-        serialization.NoEncryption(),
-    ).decode()
-    subject_dn = f"CN={cn}"
-    return cert_pem, key_pem, subject_dn
 
 
 def b64url(n: int, length: int = 32) -> str:
@@ -240,6 +202,12 @@ def main() -> None:
         default=CONFORMANCE_BASE_URL,
         help="Conformance suite base URL for redirect URIs",
     )
+    parser.add_argument(
+        "--certs-dir",
+        type=Path,
+        default=CERTS_DIR,
+        help="Directory holding the client CA (default: <repo>/certs)",
+    )
     args = parser.parse_args()
 
     raw = args.config.read_text()
@@ -271,8 +239,9 @@ def main() -> None:
     key_pem = ""
     subject_dn = ""
     if is_fapi2 and needs_mtls:
-        cert_pem, key_pem, subject_dn = generate_self_signed_cert(
-            f"{client_alias}-client1"
+        ensure_client_ca(args.certs_dir)
+        cert_pem, key_pem, subject_dn = issue_client_cert(
+            f"{client_alias}-client1", args.certs_dir
         )
         print("# mTLS client cert generated", file=sys.stderr)
 
@@ -321,8 +290,8 @@ def main() -> None:
         subject_dn2 = ""
         if needs_mtls:
             cert_pem2, key_pem2, subject_dn2 = (
-                generate_self_signed_cert(
-                    f"{client_alias}-client2"
+                issue_client_cert(
+                    f"{client_alias}-client2", args.certs_dir
                 )
             )
             print(

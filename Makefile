@@ -23,7 +23,7 @@ $(PYTHON):
 init:
 	git submodule update --init --recursive
 
-certs:
+certs: $(PYTHON)
 	@mkdir -p certs
 	@test -f certs/vouch.crt || \
 		openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
@@ -47,6 +47,7 @@ certs:
 			-addext "subjectAltName=DNS:localhost,DNS:nginx,DNS:localhost.emobix.co.uk" \
 			2>/dev/null && \
 		echo "Generated certs/nginx.crt"
+	@$(PYTHON) $(SCRIPTS)/client_ca.py certs
 
 build: init certs
 	cd conformance-suite && \

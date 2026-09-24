@@ -28,7 +28,7 @@ Python scripts handle plan creation, client registration, test execution, and fa
 | Vouch source | -- | Cloned at `../vouch` relative to this repo (override with `VOUCH_REPO_PATH`) |
 
 > [!NOTE]
-> The `cryptography` Python package is required for FAPI 2.0 tests (ES256 key generation and self-signed mTLS certificates). OIDC tests use dynamic client registration built into the conformance suite and need no extra dependencies.
+> The `cryptography` Python package is required for FAPI 2.0 tests (ES256 key generation, the test client CA, and mTLS client certificates). OIDC tests use dynamic client registration built into the conformance suite and need no extra dependencies.
 
 ## Quick Start
 
@@ -81,7 +81,7 @@ make test-oidc-rp-logout  # RP-Initiated Logout OP (end_session_endpoint)
 
 ### FAPI 2.0 Security Profile
 
-FAPI 2.0 plans require pre-registering OAuth clients. Each `make` target handles this automatically via `register_client.py`, which generates ES256 key pairs and (for mTLS variants) self-signed client certificates.
+FAPI 2.0 plans require pre-registering OAuth clients. Each `make` target handles this automatically via `register_client.py`, which generates ES256 key pairs and (for mTLS variants) client certificates issued by the test client CA in `certs/client-ca.crt`. Vouch trusts that CA through `VOUCH_MTLS_CLIENT_CA_CERTS`, because `tls_client_auth` (RFC 8705 §2.1) only accepts a certificate that chains to a configured anchor.
 
 | Target | `client_auth_type` | `sender_constrain` |
 |--------|--------------------|--------------------|
@@ -162,7 +162,7 @@ The conformance suite reaches Vouch at `https://vouch` (Docker-internal DNS). Vo
 | Script | Purpose |
 |--------|---------|
 | `scripts/run.py` | Main test runner. Creates plans, starts modules, polls for completion, auto-dumps failure logs. Saves state to `.last-run.json`. |
-| `scripts/register_client.py` | Dynamic Client Registration against Vouch. Generates ES256 key pairs (`private_key_jwt`) and self-signed certs (`tls_client_auth`). Outputs `export` statements consumed via `eval`. |
+| `scripts/register_client.py` | Dynamic Client Registration against Vouch. Generates ES256 key pairs (`private_key_jwt`) and client certificates issued by the test client CA (`tls_client_auth`). Outputs `export` statements consumed via `eval`. |
 | `scripts/conformance.py` | HTTP client for conformance suite REST API (`/api/plan`, `/api/runner`, `/api/info`, `/api/log`). |
 | `scripts/debug.py` | Debug helper with subcommands: `failures`, `log`, `status`, `vouch-logs`. Reads `.last-run.json`. |
 

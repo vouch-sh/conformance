@@ -79,9 +79,12 @@ services:
       VOUCH_TRUSTED_PROXIES: "0.0.0.0/0"
       VOUCH_MTLS_PORT: "8443"
       VOUCH_EXTRA_CA_CERTS: "/certs/nginx.crt"
+      # Trust anchor for tls_client_auth client certificates (RFC 8705 §2.1).
+      VOUCH_MTLS_CLIENT_CA_CERTS: "/certs/client-ca.crt"
     volumes:
       - vouch-data:/data
       - ./certs/nginx.crt:/certs/nginx.crt:ro
+      - ./certs/client-ca.crt:/certs/client-ca.crt:ro
     networks:
       - conformance-net
 
