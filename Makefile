@@ -1,4 +1,4 @@
-.PHONY: init build certs up down logs wait clean \
+.PHONY: init build certs client-ca up down logs wait clean \
 	restart-vouch vouch-logs \
 	test-oidc-basic test-oidc-config test-oidc-dynamic test-oidc-formpost \
 	test-oidc-rp-logout \
@@ -23,7 +23,7 @@ $(PYTHON):
 init:
 	git submodule update --init --recursive
 
-certs: $(PYTHON)
+certs: client-ca
 	@mkdir -p certs
 	@test -f certs/vouch.crt || \
 		openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
@@ -47,7 +47,26 @@ certs: $(PYTHON)
 			-addext "subjectAltName=DNS:localhost,DNS:nginx,DNS:localhost.emobix.co.uk" \
 			2>/dev/null && \
 		echo "Generated certs/nginx.crt"
-	@$(PYTHON) $(SCRIPTS)/client_ca.py certs
+
+# CA that issues tls_client_auth client certificates (RFC 8705 section 2.1);
+# Vouch trusts it through VOUCH_MTLS_CLIENT_CA_CERTS and reads it at startup,
+# so it must exist before Vouch starts. The key is generated separately with a
+# named-curve encoding: LibreSSL's `req -newkey ec` writes explicit curve
+# parameters, which certificate verifiers reject.
+client-ca:
+	@mkdir -p certs
+	@test -f certs/client-ca.crt || { \
+		openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 \
+			-pkeyopt ec_param_enc:named_curve -out certs/client-ca.key && \
+		chmod 600 certs/client-ca.key && \
+		openssl req -x509 -new -key certs/client-ca.key -days 3650 \
+			-out certs/client-ca.crt \
+			-subj "/CN=Vouch Conformance Client CA" \
+			-addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
+			-addext "keyUsage=critical,keyCertSign,cRLSign" \
+			2>/dev/null && \
+		echo "Generated certs/client-ca.crt"; \
+	}
 
 build: init certs
 	cd conformance-suite && \

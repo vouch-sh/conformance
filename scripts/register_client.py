@@ -27,7 +27,7 @@ import sys
 import urllib.request
 from pathlib import Path
 
-from client_ca import ensure_client_ca, issue_client_cert
+from client_ca import issue_client_cert
 
 CONFORMANCE_BASE_URL = "https://localhost.emobix.co.uk:8443"
 CERTS_DIR = Path(__file__).resolve().parent.parent / "certs"
@@ -239,7 +239,6 @@ def main() -> None:
     key_pem = ""
     subject_dn = ""
     if is_fapi2 and needs_mtls:
-        ensure_client_ca(args.certs_dir)
         cert_pem, key_pem, subject_dn = issue_client_cert(
             f"{client_alias}-client1", args.certs_dir
         )
