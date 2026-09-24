@@ -171,6 +171,9 @@ jobs:
             -keyout /tmp/vouch-tls.key -out /tmp/vouch-tls.crt \
             -subj "/CN=ci.vouch.sh" -addext "subjectAltName=DNS:ci.vouch.sh" 2>/dev/null
 
+      - name: Generate tls_client_auth client CA
+        run: uv run --with cryptography scripts/client_ca.py certs
+
       - name: Start vouch
         env:
           IMAGE: ${{ steps.image.outputs.image }}
@@ -192,6 +195,8 @@ jobs:
             -e VOUCH_TLS_CERT="${TLS_CERT}" \
             -e VOUCH_TLS_KEY="${TLS_KEY}" \
             -e VOUCH_MTLS_PORT="8443" \
+            -e VOUCH_MTLS_CLIENT_CA_CERTS="/certs/client-ca.crt" \
+            -v "${PWD}/certs/client-ca.crt:/certs/client-ca.crt:ro" \
             -e VOUCH_TRUSTED_PROXIES="0.0.0.0/0" \
             -e VOUCH_DATABASE_URL="sqlite:/data/vouch.db?mode=rwc" \
             -v vouch-data:/data \
