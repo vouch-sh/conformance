@@ -28,7 +28,7 @@ Python scripts handle plan creation, client registration, test execution, and fa
 | Vouch source | -- | Cloned at `../vouch` relative to this repo (override with `VOUCH_REPO_PATH`) |
 
 > [!NOTE]
-> The `cryptography` Python package is required for FAPI 2.0 tests (ES256 key generation, the test client CA, and mTLS client certificates). OIDC tests use dynamic client registration built into the conformance suite and need no extra dependencies.
+> The `cryptography` Python package is required for FAPI 2.0 tests (ES256 key generation and mTLS client certificates issued by the test client CA, which `make certs` creates with openssl). OIDC tests use dynamic client registration built into the conformance suite and need no extra dependencies.
 
 ## Quick Start
 

@@ -172,7 +172,7 @@ jobs:
             -subj "/CN=ci.vouch.sh" -addext "subjectAltName=DNS:ci.vouch.sh" 2>/dev/null
 
       - name: Generate tls_client_auth client CA
-        run: uv run --with cryptography scripts/client_ca.py certs
+        run: make client-ca
 
       - name: Start vouch
         env:
